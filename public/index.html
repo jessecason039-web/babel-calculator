@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>حاسبة التوصيل - بابل إكسبريس</title>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        :root { --primary: #0284c7; --success: #10b981; --dark: #0f172a; --gray-100: #f8fafc; --gray-200: #e2e8f0; }
+        * { box-sizing: border-box; font-family: 'Tajawal', sans-serif; }
+        body { background: #f1f5f9; margin: 0; padding: 20px 10px; color: var(--dark); }
+        .container { max-width: 850px; margin: auto; background: #fff; padding: 25px; border-radius: 14px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
+        h2 { text-align: center; margin-top: 0; }
+        .search-box { background: var(--gray-100); border: 1px solid var(--gray-200); padding: 15px; border-radius: 10px; margin-bottom: 15px; }
+        .flex { display: flex; gap: 10px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 15px; }
+        label { font-size: 13px; font-weight: bold; margin-bottom: 4px; display: block; color: #475569; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; outline: none; background: #fff; }
+        input:focus, select:focus { border-color: var(--primary); }
+        #map { height: 260px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #cbd5e1; }
+        button { background: var(--primary); color: #fff; border: none; padding: 10px 18px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        .btn-calc { width: 100%; background: var(--success); padding: 14px; font-size: 16px; margin-top: 10px; }
+        .badge { display: inline-block; background: #e0f2fe; color: #0369a1; padding: 6px 12px; border-radius: 6px; font-size: 14px; font-weight: bold; margin-bottom: 15px; }
+        .result-box { margin-top: 15px; padding: 15px; border-radius: 8px; display: none; }
+        .success { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; }
+        .error { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>🚚 حاسبة تكلفة التوصيل (بابل إكسبريس)</h2>
+
+    <!-- 1. البحث النصي -->
+    <div class="search-box">
+        <label>🔍 بحث نصي ذكي (اسم المدينة والشارع):</label>
+        <div class="flex">
+            <input type="text" id="addressInput" placeholder="مثال: دمشق أبو رمانة أو حلب الفرقان">
+            <button onclick="searchAddress()">بحث ومطابقة</button>
+        </div>
+        <div id="searchStatus" style="font-size: 13px; margin-top: 5px;"></div>
+    </div>
+
+    <!-- 2. الخريطة -->
+    <label>🗺️ أو انقر على الخريطة لتحديد الحي المباشر:</label>
+    <div id="map"></div>
+
+    <div>
+        <label>الحي المستهدف المحدد:</label>
+        <div id="selectedBadge" class="badge">لم يتم التحديد بعد</div>
+    </div>
+
+    <!-- 3. القوائم المنسدلة -->
+    <div class="grid">
+        <div>
+            <label>المحافظة / المدينة:</label>
+            <select id="citySelect" onchange="loadAreas()">
+                <option value="">-- اختر المدينة --</option>
+            </select>
+        </div>
+        <div>
+            <label>المنطقة:</label>
+            <select id="areaSelect" onchange="loadNeighbourhoods()" disabled>
+                <option value="">-- اختر المنطقة --</option>
+            </select>
+        </div>
+        <div>
+            <label>الحي:</label>
+            <select id="neighbourhoodSelect" onchange="manualSelectNeighbourhood()" disabled>
+                <option value="">-- اختر الحي --</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- 4. مواصفات الطرد -->
+    <div class="grid">
+        <div>
+            <label>نوع الشحنة:</label>
+            <select id="pkgType">
+                <option value="box">طرد / كرتونة</option>
+                <option value="envelope">ظرف وثائق</option>
+            </select>
+        </div>
+        <div>
+            <label>الوزن (كغ):</label>
+            <input type="number" id="pkgWeight" value="1" min="0.5" step="0.5">
+        </div>
+        <div>
+            <label>نوع التسليم:</label>
+            <select id="deliveryType">
+                <option value="address">توصيل للعنوان</option>
+                <option value="hub">استلام من الفرع</option>
+            </select>
+        </div>
+    </div>
+
+    <button class="btn-calc" onclick="calculate()">💰 حساب التكلفة</button>
+
+    <div id="resultBox" class="result-box"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    let selectedId = null;
+
+    // الاتصال بالسيرفر المحلي
+    async function api(action, data = {}) {
+        const res = await fetch(`/api/${action}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        return await res.json();
+    }
+
+    // إعداد الخريطة
+    const map = L.map('map').setView([34.8021, 38.9968], 7);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    let marker;
+
+    map.on('click', async (e) => {
+        const { lat, lng } = e.latlng;
+        if (marker) map.removeLayer(marker);
+        marker = L.marker([lat, lng]).addTo(map);
+
+        document.getElementById('selectedBadge').innerText = "⏳ جاري التعرف على الموقع...";
+        const res = await api('findNeighbourhoodByCoordinates', { coordinates: { lat, lng } });
+
+        if (res.status === 'success') {
+            selectedId = res.neighbourhood.id;
+            document.getElementById('selectedBadge').innerText = `✅ تم التحديد: ${res.neighbourhood.name}`;
+        } else {
+            document.getElementById('selectedBadge').innerText = "❌ موقع خارج التغطية";
+            selectedId = null;
+        }
+    });
+
+    // البحث النصي
+    async function searchAddress() {
+        const text = document.getElementById('addressInput').value.trim();
+        const status = document.getElementById('searchStatus');
+        if (!text) return alert("اكتب العنوان أولاً");
+
+        status.innerHTML = "⏳ جاري البحث...";
+        const res = await api('findNeighbourhoodByAddress', { address: text });
+
+        if (res.status === 'success') {
+            selectedId = res.neighbourhood.id;
+            status.innerHTML = `<span style="color:#10b981">✅ تم العثور على: ${res.city.name} - ${res.neighbourhood.name}</span>`;
+            document.getElementById('selectedBadge').innerText = `✅ ${res.city.name} - ${res.neighbourhood.name}`;
+        } else {
+            status.innerHTML = `<span style="color:#ef4444">❌ لم يتم العثور على عنوان مطابق</span>`;
+        }
+    }
+
+    // القوائم المنسدلة
+    async function loadCities() {
+        const res = await api('getCities');
+        const select = document.getElementById('citySelect');
+        select.innerHTML = '<option value="">-- اختر المدينة --</option>';
+        if (res.cities) {
+            res.cities.forEach(c => select.innerHTML += `<option value="${c.id}">${c.name}</option>`);
+        }
+    }
+
+    async function loadAreas() {
+        const cityID = document.getElementById('citySelect').value;
+        const areaSelect = document.getElementById('areaSelect');
+        const nSelect = document.getElementById('neighbourhoodSelect');
+        areaSelect.innerHTML = '<option value="">-- اختر المنطقة --</option>';
+        nSelect.innerHTML = '<option value="">-- اختر الحي --</option>';
+        nSelect.disabled = true;
+
+        if (!cityID) return;
+        const res = await api('getAreas', { cityID: parseInt(cityID) });
+        if (res.areas) {
+            areaSelect.disabled = false;
+            res.areas.forEach(a => areaSelect.innerHTML += `<option value="${a.id}">${a.name}</option>`);
+        }
+    }
+
+    async function loadNeighbourhoods() {
+        const areaID = document.getElementById('areaSelect').value;
+        const nSelect = document.getElementById('neighbourhoodSelect');
+        nSelect.innerHTML = '<option value="">-- اختر الحي --</option>';
+
+        if (!areaID) return;
+        const res = await api('getNeighbourhoods', { areaID: parseInt(areaID) });
+        if (res.neighbourhoods) {
+            nSelect.disabled = false;
+            res.neighbourhoods.forEach(n => nSelect.innerHTML += `<option value="${n.id}">${n.name}</option>`);
+        }
+    }
+
+    function manualSelectNeighbourhood() {
+        const nSelect = document.getElementById('neighbourhoodSelect');
+        if (nSelect.value) {
+            selectedId = parseInt(nSelect.value);
+            document.getElementById('selectedBadge').innerText = `✅ القائمة: ${nSelect.options[nSelect.selectedIndex].text}`;
+        }
+    }
+
+    // حساب التكلفة
+    async function calculate() {
+        const result = document.getElementById('resultBox');
+        if (!selectedId) return alert("يرجى اختيار الحي أولاً");
+
+        result.style.display = 'block';
+        result.className = 'result-box';
+        result.innerHTML = '⏳ جاري احتساب التكلفة...';
+
+        const payload = {
+            delivery: {
+                receiver: { neighbourhood: { id: selectedId } },
+                type: document.getElementById('pkgType').value,
+                parts: [{ weight: parseFloat(document.getElementById('pkgWeight').value) }],
+                deliveryType: document.getElementById('deliveryType').value,
+                payer: "receiver"
+            }
+        };
+
+        const res = await api('calculatePrice', payload);
+        if (res.status === 'success') {
+            result.className = 'result-box success';
+            result.innerHTML = `
+                <h3 style="margin:0 0 8px 0;">🎉 كلفة التوصيل: ${res.price.toLocaleString()} ${res.currency}</h3>
+                <div>أجور الشحن: ${res.details.shipping.toLocaleString()} | أجور التوصيل: ${res.details.dropoff.toLocaleString()}</div>
+            `;
+        } else {
+            result.className = 'result-box error';
+            result.innerHTML = `❌ ${res.errorMessage || 'المنطقة غير مدعومة'}`;
+        }
+    }
+
+    loadCities();
+</script>
+</body>
+</html>
