@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>حاسبة أجور التوصيل - بابل إكسبريس</title>
+    <title>حاسبة أجور توصيل الظروف - بابل إكسبريس</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -241,12 +241,19 @@
         }
 
         .price-highlight {
-            font-size: 26px;
+            font-size: 28px;
             font-weight: 800;
             color: #047857;
             display: flex;
             align-items: center;
             gap: 8px;
+        }
+
+        .price-sub {
+            font-size: 13px;
+            color: #059669;
+            margin-top: 4px;
+            font-weight: 600;
         }
 
         @keyframes fadeIn {
@@ -259,8 +266,8 @@
 
 <div class="container">
     <div class="header">
-        <h1>🛵 حاسبة أجور التوصيل للزبون</h1>
-        <p>نظام الاستعلام التلقائي والمباشر لمسؤولي المبيعات (بابل إكسبريس)</p>
+        <h1>✉️ حاسبة أجور توصيل الظروف (Envelope)</h1>
+        <p>نظام استعلام أجور التوصيل الصافية لعنوان الزبون (بابل إكسبريس)</p>
     </div>
 
     <!-- 1. شريط البحث الشامل -->
@@ -332,11 +339,8 @@
     // ==========================================
     async function initLocationsDatabase() {
         const dbStatus = document.getElementById('dbStatus');
-        
-        // جلب المدن فوراً لتشغيل القوائم
         loadCitiesFallback();
 
-        // محاولة جلب الشجرة الكاملة
         try {
             const res = await fetch('/api/locations-tree');
             const data = await res.json();
@@ -346,7 +350,6 @@
                 dbStatus.innerText = `✅ تم ربط ${allNeighbourhoodsList.length} منطقة وحي`;
                 populateCitiesDropdown();
             } else {
-                // إعادة المحاولة بعد 3 ثواني في حال كان السيرفر يقوم بالبناء لأول مرة
                 setTimeout(initLocationsDatabase, 3000);
             }
         } catch (err) {
@@ -406,7 +409,7 @@
     }
 
     // ==========================================
-    // 3. البحث الهجين اللحظي
+    // 3. البحث الهجين اللحظي (أحياء + شوارع)
     // ==========================================
     const searchInput = document.getElementById('liveSearchInput');
     const suggestionsBox = document.getElementById('suggestionsBox');
@@ -701,18 +704,19 @@
     }
 
     // ==========================================
-    // 7. حساب أجرة التوصيل الفورية (Dropoff)
+    // 7. حساب أجور توصيل الظرف حصراً (Envelope Dropoff Only)
     // ==========================================
     async function autoCalculateDeliveryFee(neighbourhoodId) {
         const resultBox = document.getElementById('resultBox');
         showLoadingPrice();
 
+        // إرسال نوع الشحنة كـ ظرف حصراً بوزن 1 كغ
         const payload = {
             delivery: {
                 receiver: {
                     neighbourhood: { id: parseInt(neighbourhoodId) }
                 },
-                type: "box",
+                type: "envelope",
                 parts: [{ weight: 1 }],
                 deliveryType: "address",
                 payer: "receiver"
@@ -722,13 +726,17 @@
         try {
             const data = await api('calculatePrice', payload);
             if (data.status === 'success') {
+                // استخراج أجرة توصيل الظرف للعنوان حصراً (Dropoff)
                 const deliveryFee = data.details && data.details.dropoff !== undefined ? data.details.dropoff : 0;
 
                 resultBox.className = 'result-box success';
                 resultBox.innerHTML = `
-                    <div style="font-size: 14px; font-weight: 700; color: #065f46; margin-bottom: 4px;">🛵 أجور التوصيل إلى عنوان الزبون:</div>
+                    <div style="font-size: 14px; font-weight: 700; color: #065f46; margin-bottom: 4px;">✉️ أجور توصيل الظرف إلى عنوان الزبون:</div>
                     <div class="price-highlight">
                         ${deliveryFee.toLocaleString()} <span style="font-size: 18px;">${data.currency}</span>
+                    </div>
+                    <div class="price-sub">
+                        (أجرة التوصيل للعنوان فقط - شحنة ظرف حصراً)
                     </div>
                 `;
             } else {
@@ -745,7 +753,7 @@
         const resultBox = document.getElementById('resultBox');
         resultBox.style.display = 'block';
         resultBox.className = 'result-box loading';
-        resultBox.innerHTML = '⏳ جاري جلب أجرة التوصيل للعنوان...';
+        resultBox.innerHTML = '⏳ جاري جلب أجرة توصيل الظرف...';
     }
 
     function hidePriceBox() {
