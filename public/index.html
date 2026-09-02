@@ -628,7 +628,7 @@
         const resultBox = document.getElementById('resultBox');
         resultBox.style.display = 'block';
         resultBox.className = 'result-box error';
-        resultBox.innerHTML = `❌ المنطقة المحددة خارج نطاق التغطية`;
+        resultBox.innerHTML = `❌ المنطقة المحددة خارج نطاق التغطية (لا توصيل)`;
     }
 
     // ==========================================
@@ -745,7 +745,7 @@
             }
         } catch (err) {
             resultBox.className = 'result-box error';
-            resultBox.innerHTML = '❌ فشل احتساب أجرة التوصيل';
+            resultBox.innerHTML = '❌ المنطقة المحددة خارج نطاق التغطية (لا توصيل)';
         }
     }
 
