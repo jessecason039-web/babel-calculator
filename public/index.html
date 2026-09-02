@@ -259,7 +259,7 @@
         <label class="search-label">🔍 إيجاد حي / منطقة من الخريطة بالبحث اللحظي:</label>
         <div class="search-input-wrap">
             <span class="search-icon">📍</span>
-            <input type="text" id="liveSearchInput" class="search-input" placeholder="اكتب اسم الحي، المدينة، أو البلدة (مثال: قنيطرة، الفرقان، الميدان)..." autocomplete="off">
+            <input type="text" id="liveSearchInput" class="search-input" placeholder="اكتب اسم الحي، المدينة، أو البلدة (مثال: طرطوس، قنيطرة، الفرقان)..." autocomplete="off">
         </div>
         <!-- قائمة الاقتراحات المنبثقة -->
         <div id="suggestionsBox" class="suggestions-list"></div>
@@ -304,6 +304,7 @@
 <script>
     let selectedNeighbourhoodId = null;
     let searchDebounceTimer = null;
+    let citiesList = [];
 
     // الاتصال مع السيرفر
     async function api(action, data = {}) {
@@ -406,47 +407,62 @@
         const lng = parseFloat(item.lon);
         setMarker(lat, lng, 14);
 
-        await identifyAndAutoSelectByCoords(lat, lng, mainTitle);
+        await identifyAndAutoSelectByCoords(lat, lng, item.display_name);
     }
 
     // ==========================================
-    // 3. التعرف على الموقع وتعبئة القوائم وحساب الأجرة فوراً
+    // 3. التعرف الدقيق على المحافظة والحي (منع التداخل)
     // ==========================================
-    async function identifyAndAutoSelectByCoords(lat, lng, fallbackTitle = "") {
-        document.getElementById('selectedBadge').innerText = "⏳ جاري التعرف ومطابقة المنطقة...";
+    async function identifyAndAutoSelectByCoords(lat, lng, fallbackFullName = "") {
+        document.getElementById('selectedBadge').innerText = "⏳ جاري التعرف ومطابقة المنطقة بدقة...";
         showLoadingPrice();
 
         try {
+            let detectedCity = "";
+            let detectedPlace = "";
+
+            // أ) جلب اسم المحافظة الجغرافية الحقيقية من الخريطة (طرطوس، حمص، دمشق...)
+            try {
+                const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=ar&addressdetails=1`);
+                const geoData = await geoRes.json();
+                if (geoData && geoData.address) {
+                    const addr = geoData.address;
+                    detectedCity = addr.state || addr.province || addr.city || addr.governorate || "";
+                    detectedCity = detectedCity.replace("محافظة", "").trim();
+                    detectedPlace = addr.suburb || addr.neighbourhood || addr.quarter || addr.village || addr.town || addr.city || "";
+                }
+            } catch (e) {
+                console.log("Geo reverse lookup error", e);
+            }
+
+            // ب) فحص إحداثيات بابل إكسبريس
             const resCoords = await api('findNeighbourhoodByCoordinates', { coordinates: { lat, lng } });
+            let nName = (resCoords.status === 'success' && resCoords.neighbourhood) ? resCoords.neighbourhood.name : detectedPlace;
+            let nId = (resCoords.status === 'success' && resCoords.neighbourhood) ? resCoords.neighbourhood.id : null;
 
-            if (resCoords.status === 'success' && resCoords.neighbourhood) {
-                selectedNeighbourhoodId = resCoords.neighbourhood.id;
-                const nName = resCoords.neighbourhood.name;
+            // ج) بناء نص بحث دقيق يحتوي على اسم المحافظة (مثال: "طرطوس الكورنيش")
+            let searchAddressText = "";
+            if (detectedCity && nName) {
+                searchAddressText = `${detectedCity} ${nName}`;
+            } else if (fallbackFullName) {
+                searchAddressText = fallbackFullName;
+            } else {
+                searchAddressText = nName;
+            }
 
-                const resAddress = await api('findNeighbourhoodByAddress', { address: nName });
-                
-                if (resAddress.status === 'success' && resAddress.city && resAddress.area) {
-                    await populateDropdownsCascade(resAddress.city.id, resAddress.area.id, resCoords.neighbourhood.id);
-                    document.getElementById('selectedBadge').innerText = `✅ ${resAddress.city.name} > ${resAddress.area.name} > ${nName}`;
-                } else {
-                    document.getElementById('selectedBadge').innerText = `✅ الحي المحدد: ${nName}`;
-                }
-
-                // الحساب التلقائي الفوري لأجرة التوصيل
+            // د) مطابقة العنوان الدقيق
+            const resAddress = await api('findNeighbourhoodByAddress', { address: searchAddressText });
+            
+            if (resAddress.status === 'success' && resAddress.city && resAddress.area && resAddress.neighbourhood) {
+                selectedNeighbourhoodId = resAddress.neighbourhood.id;
+                await populateDropdownsCascade(resAddress.city.id, resAddress.area.id, resAddress.neighbourhood.id);
+                document.getElementById('selectedBadge').innerText = `✅ ${resAddress.city.name} > ${resAddress.area.name} > ${resAddress.neighbourhood.name}`;
                 await autoCalculateDeliveryFee(selectedNeighbourhoodId);
-
-            } else if (fallbackTitle) {
-                const resAddress = await api('findNeighbourhoodByAddress', { address: fallbackTitle });
-                if (resAddress.status === 'success' && resAddress.neighbourhood) {
-                    selectedNeighbourhoodId = resAddress.neighbourhood.id;
-                    await populateDropdownsCascade(resAddress.city.id, resAddress.area.id, resAddress.neighbourhood.id);
-                    document.getElementById('selectedBadge').innerText = `✅ ${resAddress.city.name} > ${resAddress.area.name} > ${resAddress.neighbourhood.name}`;
-                    
-                    // الحساب التلقائي الفوري لأجرة التوصيل
-                    await autoCalculateDeliveryFee(selectedNeighbourhoodId);
-                } else {
-                    handleOutOfCoverage();
-                }
+            } else if (nId) {
+                // إذا لم تنجح المطابقة النصية، نعتمد حي بابل المباشر
+                selectedNeighbourhoodId = nId;
+                document.getElementById('selectedBadge').innerText = `✅ الحي المحدد: ${nName}`;
+                await autoCalculateDeliveryFee(selectedNeighbourhoodId);
             } else {
                 handleOutOfCoverage();
             }
@@ -487,6 +503,7 @@
             const citySelect = document.getElementById('citySelect');
             citySelect.innerHTML = '<option value="">-- اختر المدينة --</option>';
             if (data.cities) {
+                citiesList = data.cities;
                 data.cities.forEach(c => {
                     citySelect.innerHTML += `<option value="${c.id}">${c.name}</option>`;
                 });
@@ -547,21 +564,18 @@
         }
     }
 
-    // عند اختيار الحي يدوياً من القائمة المنسدلة: حساب فوري
     async function onNeighbourhoodChange() {
         const nSelect = document.getElementById('neighbourhoodSelect');
         if (nSelect.value) {
             selectedNeighbourhoodId = parseInt(nSelect.value);
             const name = nSelect.options[nSelect.selectedIndex].text;
             document.getElementById('selectedBadge').innerText = `✅ تم الاختيار يدوياً: ${name}`;
-            
-            // حساب فوري وتلقائي
             await autoCalculateDeliveryFee(selectedNeighbourhoodId);
         }
     }
 
     // ==========================================
-    // 5. الحساب التلقائي وإظهار أجرة التوصيل فقط (Dropoff)
+    // 5. الحساب التلقائي لأجور التوصيل للعنوان (Dropoff)
     // ==========================================
     async function autoCalculateDeliveryFee(neighbourhoodId) {
         const resultBox = document.getElementById('resultBox');
@@ -582,7 +596,6 @@
         try {
             const data = await api('calculatePrice', payload);
             if (data.status === 'success') {
-                // استخراج أجور التوصيل فقط (Dropoff)
                 const deliveryFee = data.details && data.details.dropoff !== undefined ? data.details.dropoff : 0;
 
                 resultBox.className = 'result-box success';
@@ -614,7 +627,6 @@
         resultBox.style.display = 'none';
     }
 
-    // تحميل المدن عند فتح الصفحة
     loadCities();
 </script>
 </body>
