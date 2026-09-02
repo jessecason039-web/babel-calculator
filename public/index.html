@@ -93,7 +93,7 @@
             padding: 13px 40px 13px 15px;
             border: 2px solid #0284c7;
             border-radius: 10px;
-            font-size: 16px;
+            font-size: 15px;
             outline: none;
             transition: all 0.2s;
             background: #ffffff;
@@ -110,7 +110,7 @@
             color: var(--primary);
         }
 
-        /* قائمة الاقتراحات الشاملة المطابقة للصور */
+        /* قائمة الاقتراحات الشاملة والمنظمة */
         .suggestions-list {
             position: absolute;
             top: 100%;
@@ -120,7 +120,7 @@
             border: 1px solid var(--gray-200);
             border-radius: 10px;
             box-shadow: 0 12px 30px rgba(0,0,0,0.15);
-            max-height: 340px;
+            max-height: 350px;
             overflow-y: auto;
             z-index: 1000;
             margin-top: 6px;
@@ -144,8 +144,11 @@
 
         .suggestion-title {
             font-weight: 800;
-            font-size: 16px;
+            font-size: 15px;
             color: #0f172a;
+            display: flex;
+            align-items: center;
+            gap: 6px;
             margin-bottom: 3px;
         }
 
@@ -265,17 +268,17 @@
         <p>نظام الاستعلام التلقائي والمباشر لمسؤولي المبيعات (بابل إكسبريس)</p>
     </div>
 
-    <!-- 1. شريط البحث اللحظي الشامل -->
+    <!-- 1. شريط البحث الشامل -->
     <div class="search-container">
         <div class="search-label">
-            <span>إيجاد حي من الخريطة</span>
+            <span>إيجاد حي أو شارع من الخريطة:</span>
             <span id="dbStatus" class="db-status">⏳ جاري مزامنة قاعدة البيانات...</span>
         </div>
         <div class="search-input-wrap">
             <span class="search-icon">🔍</span>
-            <input type="text" id="liveSearchInput" class="search-input" placeholder="اكتب اسم الحي أو البلدة أو المحافظة (مثال: قنيطرة، الميدان، الفرقان)..." autocomplete="off">
+            <input type="text" id="liveSearchInput" class="search-input" placeholder="اكتب اسم الحي، الشارع، المعلم، أو المحافظة (مثال: قنيطرة، شارع بغداد، الفرقان)..." autocomplete="off">
         </div>
-        <!-- قائمة الاقتراحات الشاملة -->
+        <!-- قائمة الاقتراحات المرتبة بالأولويات -->
         <div id="suggestionsBox" class="suggestions-list"></div>
     </div>
 
@@ -287,7 +290,7 @@
         <div id="selectedBadge" class="badge-status">لم يتم تحديد موقع بعد</div>
     </div>
 
-    <!-- 3. القوائم المنسدلة الثلاثة -->
+    <!-- 3. القوائم المنسدلة الثلاثة (تتعبأ تلقائياً عند النقر أو البحث) -->
     <div style="font-weight: 700; color: var(--primary); margin-bottom: 8px;">📋 التقسيم الجغرافي المعتمد:</div>
     <div class="grid">
         <div>
@@ -319,8 +322,8 @@
     let selectedNeighbourhoodId = null;
     let allNeighbourhoodsList = [];
     let citiesList = [];
+    let searchDebounceTimer = null;
 
-    // الاتصال مع السيرفر
     async function api(action, data = {}) {
         const res = await fetch(`/api/${action}`, {
             method: 'POST',
@@ -341,11 +344,11 @@
             if (data.status === 'success' && data.data) {
                 citiesList = data.data.cities || [];
                 allNeighbourhoodsList = data.data.neighbourhoods || [];
-                dbStatus.innerText = `✅ تم تحميل ${allNeighbourhoodsList.length} منطقة وحي`;
+                dbStatus.innerText = `✅ تم فهرسة ${allNeighbourhoodsList.length} حي ومنطقة`;
                 populateCitiesDropdown();
             }
         } catch (err) {
-            dbStatus.innerText = `⚠️ تحديث البيانات نشط`;
+            dbStatus.innerText = `⚠️ جاري الاتصال المباشر...`;
             loadCitiesFallback();
         }
     }
@@ -359,39 +362,65 @@
     }
 
     // ==========================================
-    // 2. محرك البحث الذكي والمطابقة التقريبية (Fuzzy Search)
+    // 2. معالجة النصوص وحساب نقاط الأولوية (Smart Ranking)
     // ==========================================
-    function normalizeArabic(text) {
-        if (!text) return "";
-        return text
-            .toString()
+    function normalizeAr(str) {
+        if (!str) return '';
+        return str.toString()
             .trim()
-            .replace(/[\u064B-\u065F]/g, '') // إزالة التشكيل
+            .replace(/[\u064B-\u065F\u0670]/g, '') // إزالة التشكيل
             .replace(/[إأآا]/g, 'ا')
             .replace(/ة/g, 'ه')
             .replace(/ى/g, 'ي')
-            .replace(/^ال/, ''); // معالجة ال التعريف
+            .replace(/[\-\_\,\.]/g, ' ')
+            .replace(/\s+/g, ' ');
     }
 
-    // مطابقة تقريبية مرنة للبحث الشامل
-    function isMatch(text, query) {
-        const normText = normalizeArabic(text);
-        const normQuery = normalizeArabic(query);
-        if (normText.includes(normQuery) || normQuery.includes(normText)) return true;
+    // دالة احتساب نقاط التطابق لضمان الترتيب الدقيق
+    function calculateRelevanceScore(itemName, cityName, areaName, query) {
+        const nItem = normalizeAr(itemName);
+        const nCity = normalizeAr(cityName);
+        const nArea = normalizeAr(areaName);
+        const nQuery = normalizeAr(query);
+        const nQueryNoAl = nQuery.replace(/^ال/, '');
+        const nItemNoAl = nItem.replace(/^ال/, '');
 
-        // مطابقة الجذور (مثل قنيطرة مع قنطرة)
-        const rootText = normText.replace(/[يوه]/g, '');
-        const rootQuery = normQuery.replace(/[يوه]/g, '');
-        if (rootText.length >= 3 && rootQuery.length >= 3) {
-            if (rootText.includes(rootQuery) || rootQuery.includes(rootText)) return true;
+        // 1. تطابق تام لاسم الحي (المرتبة الأولى دائماً)
+        if (nItem === nQuery || nItemNoAl === nQueryNoAl) return 1000;
+
+        // 2. اسم الحي يبدأ بكلمة البحث
+        if (nItem.startsWith(nQuery) || nItemNoAl.startsWith(nQueryNoAl)) return 800;
+
+        // 3. اسم الحي يحتوي الكلمة ككلمة منفصلة (مثل: "حلب الجديدة")
+        const words = nItem.split(' ');
+        if (words.some(w => w === nQuery || w.replace(/^ال/, '') === nQueryNoAl)) return 600;
+
+        // 4. جزء من اسم الحي
+        if (nItem.includes(nQuery) || nItemNoAl.includes(nQueryNoAl)) return 400;
+
+        // 5. يطابق اسم المدينة أو المنطقة
+        if (nCity === nQuery || nArea === nQuery) return 300;
+        if (nCity.includes(nQuery) || nArea.includes(nQuery)) return 200;
+
+        // 6. تطابق تقريبي بالجذور (يأتي في الأسفل دائماً)
+        const rootItem = nItemNoAl.replace(/[يوه]/g, '');
+        const rootQuery = nQueryNoAl.replace(/[يوه]/g, '');
+        if (rootQuery.length >= 3 && rootItem.length >= 3) {
+            if (rootItem === rootQuery) return 100;
+            if (rootItem.includes(rootQuery) || rootQuery.includes(rootItem)) return 50;
         }
-        return false;
+
+        return 0;
     }
 
+    // ==========================================
+    // 3. البحث الهجين اللحظي (أحياء + شوارع ومعالم)
+    // ==========================================
     const searchInput = document.getElementById('liveSearchInput');
     const suggestionsBox = document.getElementById('suggestionsBox');
 
     searchInput.addEventListener('input', function() {
+        clearTimeout(searchDebounceTimer);
         const query = this.value.trim();
 
         if (query.length < 2) {
@@ -399,12 +428,42 @@
             return;
         }
 
-        // تصفية جميع النتائج من قاعدة البيانات المطابقة لشجرة بابل إكسبريس
-        const matches = allNeighbourhoodsList.filter(item => {
-            return isMatch(item.name, query) || isMatch(item.cityName, query) || isMatch(item.areaName, query);
-        });
+        searchDebounceTimer = setTimeout(async () => {
+            // أ) جلب وفرز أحياء بابل إكسبريس حسب الأولوية
+            let babelMatches = [];
+            allNeighbourhoodsList.forEach(item => {
+                const score = calculateRelevanceScore(item.name, item.cityName, item.areaName, query);
+                if (score > 0) {
+                    babelMatches.push({ ...item, score, type: 'babel' });
+                }
+            });
 
-        renderSuggestions(matches);
+            // ترتيب نتائج بابل: الأعلى نقاطاً يظهر أولاً
+            babelMatches.sort((a, b) => b.score - a.score || a.name.length - b.name.length);
+
+            // ب) البحث عن الشوارع والمعالم التفصيلية في سوريا عبر OpenStreetMap
+            let streetMatches = [];
+            try {
+                const osmRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=sy&q=${encodeURIComponent(query)}&addressdetails=1&limit=6&accept-language=ar`);
+                const osmData = await osmRes.json();
+                if (osmData && osmData.length > 0) {
+                    osmData.forEach(item => {
+                        const isRoad = item.class === 'highway' || item.type === 'road' || item.type === 'residential' || item.type === 'street';
+                        const mainTitle = item.address.road || item.address.suburb || item.address.neighbourhood || item.name;
+                        streetMatches.push({
+                            title: mainTitle,
+                            displayName: item.display_name,
+                            lat: parseFloat(item.lat),
+                            lon: parseFloat(item.lon),
+                            isRoad: isRoad,
+                            type: 'osm'
+                        });
+                    });
+                }
+            } catch (e) {}
+
+            renderCombinedSuggestions(babelMatches, streetMatches);
+        }, 200);
     });
 
     document.addEventListener('click', function(e) {
@@ -413,61 +472,85 @@
         }
     });
 
-    function renderSuggestions(items) {
+    function renderCombinedSuggestions(babelItems, streetItems) {
         suggestionsBox.innerHTML = '';
-        if (items && items.length > 0) {
-            items.slice(0, 40).forEach(item => { // عرض حتى 40 نتيجة شاملة
-                const div = document.createElement('div');
-                div.className = 'suggestion-item';
-                div.innerHTML = `
-                    <div class="suggestion-title">${item.name}</div>
-                    <div class="suggestion-line1">سوريا - ${item.cityName} - ${item.areaName} - ${item.name}</div>
-                    <div class="suggestion-line2">${item.name} - ${item.areaName} - ${item.cityName}</div>
-                `;
-                div.onclick = () => {
-                    selectSuggestion(item);
-                };
-                suggestionsBox.appendChild(div);
-            });
+        let totalCount = 0;
+
+        // 1. عرض مطابقات الأحياء ذات الأولوية العالية أولاً
+        const topBabel = babelItems.filter(b => b.score >= 400);
+        topBabel.forEach(item => {
+            appendBabelItem(item);
+            totalCount++;
+        });
+
+        // 2. عرض الشوارع والمعالم المطابقة
+        streetItems.forEach(item => {
+            appendStreetItem(item);
+            totalCount++;
+        });
+
+        // 3. عرض المطابقات التقريبية والمتبقية في الأسفل
+        const remainingBabel = babelItems.filter(b => b.score < 400);
+        remainingBabel.forEach(item => {
+            appendBabelItem(item);
+            totalCount++;
+        });
+
+        if (totalCount > 0) {
             suggestionsBox.style.display = 'block';
         } else {
-            suggestionsBox.innerHTML = '<div class="suggestion-item" style="color:var(--gray-500); font-size:13px;">لا توجد مناطق مطابقة...</div>';
+            suggestionsBox.innerHTML = '<div class="suggestion-item" style="color:var(--gray-500); font-size:13px;">لا توجد نتائج مطابقة...</div>';
             suggestionsBox.style.display = 'block';
         }
     }
 
-    // عند اختيار أي منطقة من القائمة الشاملة
-    async function selectSuggestion(item) {
+    function appendBabelItem(item) {
+        const div = document.createElement('div');
+        div.className = 'suggestion-item';
+        div.innerHTML = `
+            <div class="suggestion-title">📍 ${item.name}</div>
+            <div class="suggestion-line1">سوريا - ${item.cityName} - ${item.areaName} - ${item.name}</div>
+            <div class="suggestion-line2">${item.name} - ${item.areaName} - ${item.cityName}</div>
+        `;
+        div.onclick = () => {
+            selectBabelItem(item);
+        };
+        suggestionsBox.appendChild(div);
+    }
+
+    function appendStreetItem(item) {
+        const div = document.createElement('div');
+        div.className = 'suggestion-item';
+        div.innerHTML = `
+            <div class="suggestion-title">🛣️ ${item.title} <span style="font-size:11px; font-weight:normal; color:#0284c7;">(شارع / معلم)</span></div>
+            <div class="suggestion-line1">${item.displayName}</div>
+        `;
+        div.onclick = () => {
+            selectStreetItem(item);
+        };
+        suggestionsBox.appendChild(div);
+    }
+
+    // عند اختيار حي مباشر من قائمة بابل
+    async function selectBabelItem(item) {
         searchInput.value = item.name;
         suggestionsBox.style.display = 'none';
 
-        // 1. تعبئة القوائم الثلاثة فوراً وبدقة تامة
-        await populateDropdownsCascade(item.cityId, item.areaId, item.id);
-        document.getElementById('selectedBadge').innerText = `✅ ${item.cityName} > ${item.areaName} > ${item.name}`;
-
-        // 2. تحريك الخريطة إلى النقطة بدقة
-        focusMapOnLocation(`${item.name} ${item.cityName} سوريا`);
-
-        // 3. حساب أجرة التوصيل فوراً
-        selectedNeighbourhoodId = item.id;
-        await autoCalculateDeliveryFee(selectedNeighbourhoodId);
+        // تعبئة القوائم الثلاثة فوراً
+        await applyLocationSelection(item.cityId, item.areaId, item.id, item.cityName, item.areaName, item.name, true);
     }
 
-    // نقل الخريطة للموقع المختار
-    async function focusMapOnLocation(query) {
-        try {
-            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=sy&q=${encodeURIComponent(query)}&limit=1`);
-            const data = await res.json();
-            if (data && data.length > 0) {
-                const lat = parseFloat(data[0].lat);
-                const lon = parseFloat(data[0].lon);
-                setMarker(lat, lon, 14);
-            }
-        } catch (e) {}
+    // عند اختيار شارع أو معلم
+    async function selectStreetItem(item) {
+        searchInput.value = item.title;
+        suggestionsBox.style.display = 'none';
+
+        setMarker(item.lat, item.lon, 15);
+        await identifyAndSelectByCoords(item.lat, item.lon);
     }
 
     // ==========================================
-    // 3. إعداد الخريطة والنقر المباشر
+    // 4. الخريطة والنقر المباشر (مع التعبئة الإلزامية للقوائم)
     // ==========================================
     const map = L.map('map').setView([34.8021, 38.9968], 7);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -479,7 +562,7 @@
     map.on('click', async (e) => {
         const { lat, lng } = e.latlng;
         setMarker(lat, lng);
-        await identifyByCoordinates(lat, lng);
+        await identifyAndSelectByCoords(lat, lng);
     });
 
     function setMarker(lat, lng, zoomLevel = null) {
@@ -488,18 +571,30 @@
         if (zoomLevel) map.setView([lat, lng], zoomLevel);
     }
 
-    async function identifyByCoordinates(lat, lng) {
-        document.getElementById('selectedBadge').innerText = "⏳ جاري التعرف ومطابقة المنطقة...";
+    async function identifyAndSelectByCoords(lat, lng) {
+        document.getElementById('selectedBadge').innerText = "⏳ جاري التعرف وتعبئة القوائم...";
         showLoadingPrice();
 
         try {
+            // 1. الاستعلام من نظام بابل بالإحداثيات
             const resCoords = await api('findNeighbourhoodByCoordinates', { coordinates: { lat, lng } });
+
             if (resCoords.status === 'success' && resCoords.neighbourhood) {
-                const matchedNeighbourhood = allNeighbourhoodsList.find(n => n.id === resCoords.neighbourhood.id);
-                if (matchedNeighbourhood) {
-                    await selectSuggestion(matchedNeighbourhood);
+                const targetId = resCoords.neighbourhood.id;
+                
+                // 2. البحث عن الحي في قاعدة بياناتنا المحدثة لمعرفة المدينة والمنطقة
+                let match = allNeighbourhoodsList.find(n => n.id === targetId);
+
+                if (!match) {
+                    // مطابقة بالاسم إن تعذر الـ ID
+                    match = allNeighbourhoodsList.find(n => normalizeAr(n.name) === normalizeAr(resCoords.neighbourhood.name));
+                }
+
+                if (match) {
+                    // تعبئة القوائم المنسدلة الثلاثة فوراً
+                    await applyLocationSelection(match.cityId, match.areaId, match.id, match.cityName, match.areaName, match.name, false);
                 } else {
-                    selectedNeighbourhoodId = resCoords.neighbourhood.id;
+                    selectedNeighbourhoodId = targetId;
                     document.getElementById('selectedBadge').innerText = `✅ الحي المحدد: ${resCoords.neighbourhood.name}`;
                     await autoCalculateDeliveryFee(selectedNeighbourhoodId);
                 }
@@ -512,6 +607,48 @@
         }
     }
 
+    // ==========================================
+    // 5. الدالة المركزية لتعبئة القوائم الثلاثة وحساب السعر
+    // ==========================================
+    async function applyLocationSelection(cityId, areaId, neighbourhoodId, cityName, areaName, neighbourhoodName, moveMap = false) {
+        selectedNeighbourhoodId = neighbourhoodId;
+
+        // 1. اختيار المدينة في القائمة الأولى
+        const citySelect = document.getElementById('citySelect');
+        citySelect.value = cityId;
+
+        // 2. تحميل واختيار المنطقة في القائمة الثانية
+        await populateAreasForCity(cityId);
+        const areaSelect = document.getElementById('areaSelect');
+        areaSelect.value = areaId;
+
+        // 3. تحميل واختيار الحي في القائمة الثالثة
+        await populateNeighbourhoodsForArea(areaId);
+        const nSelect = document.getElementById('neighbourhoodSelect');
+        nSelect.value = neighbourhoodId;
+
+        // 4. تحديث الشارة
+        document.getElementById('selectedBadge').innerText = `✅ ${cityName} > ${areaName} > ${neighbourhoodName}`;
+
+        // 5. تحريك الخريطة للموقع إذا لزم الأمر
+        if (moveMap) {
+            focusMapOnText(`${neighbourhoodName} ${cityName} سوريا`);
+        }
+
+        // 6. حساب أجرة التوصيل فوراً
+        await autoCalculateDeliveryFee(neighbourhoodId);
+    }
+
+    async function focusMapOnText(query) {
+        try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=sy&q=${encodeURIComponent(query)}&limit=1`);
+            const data = await res.json();
+            if (data && data.length > 0) {
+                setMarker(parseFloat(data[0].lat), parseFloat(data[0].lon), 14);
+            }
+        } catch (e) {}
+    }
+
     function handleOutOfCoverage() {
         selectedNeighbourhoodId = null;
         document.getElementById('selectedBadge').innerText = "❌ هذه المنطقة خارج نطاق التغطية حالياً";
@@ -521,21 +658,8 @@
         resultBox.innerHTML = `❌ المنطقة المحددة خارج نطاق التغطية`;
     }
 
-    async function populateDropdownsCascade(cityId, areaId, neighbourhoodId) {
-        const citySelect = document.getElementById('citySelect');
-        citySelect.value = cityId;
-
-        await loadAreasForCity(cityId);
-        const areaSelect = document.getElementById('areaSelect');
-        areaSelect.value = areaId;
-
-        await loadNeighbourhoodsForArea(areaId);
-        const nSelect = document.getElementById('neighbourhoodSelect');
-        nSelect.value = neighbourhoodId;
-    }
-
     // ==========================================
-    // 4. القوائم المنسدلة اليدوية
+    // 6. القوائم المنسدلة اليدوية
     // ==========================================
     async function loadCitiesFallback() {
         const data = await api('getCities');
@@ -548,10 +672,10 @@
     async function onCityChange() {
         hidePriceBox();
         const cityId = document.getElementById('citySelect').value;
-        await loadAreasForCity(cityId);
+        await populateAreasForCity(cityId);
     }
 
-    async function loadAreasForCity(cityId) {
+    async function populateAreasForCity(cityId) {
         const areaSelect = document.getElementById('areaSelect');
         const nSelect = document.getElementById('neighbourhoodSelect');
         areaSelect.innerHTML = '<option value="">-- اختر المنطقة --</option>';
@@ -575,10 +699,10 @@
     async function onAreaChange() {
         hidePriceBox();
         const areaId = document.getElementById('areaSelect').value;
-        await loadNeighbourhoodsForArea(areaId);
+        await populateNeighbourhoodsForArea(areaId);
     }
 
-    async function loadNeighbourhoodsForArea(areaId) {
+    async function populateNeighbourhoodsForArea(areaId) {
         const nSelect = document.getElementById('neighbourhoodSelect');
         nSelect.innerHTML = '<option value="">-- اختر الحي --</option>';
 
@@ -607,7 +731,7 @@
     }
 
     // ==========================================
-    // 5. حساب أجرة التوصيل الفورية (Dropoff)
+    // 7. حساب أجرة التوصيل الفورية (Dropoff)
     // ==========================================
     async function autoCalculateDeliveryFee(neighbourhoodId) {
         const resultBox = document.getElementById('resultBox');
@@ -659,7 +783,7 @@
         resultBox.style.display = 'none';
     }
 
-    // بدء تشغيل وتحميل قاعدة البيانات
+    // تشغيل تحميل الشجرة الجغرافية
     initLocationsDatabase();
 </script>
 </body>
