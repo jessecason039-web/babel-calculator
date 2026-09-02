@@ -3,108 +3,309 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>حاسبة التوصيل - بابل إكسبريس</title>
+    <title>حاسبة أجور التوصيل - بابل إكسبريس</title>
+    
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
     <style>
-        :root { --primary: #0284c7; --success: #10b981; --dark: #0f172a; --gray-100: #f8fafc; --gray-200: #e2e8f0; }
-        * { box-sizing: border-box; font-family: 'Tajawal', sans-serif; }
-        body { background: #f1f5f9; margin: 0; padding: 20px 10px; color: var(--dark); }
-        .container { max-width: 850px; margin: auto; background: #fff; padding: 25px; border-radius: 14px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
-        h2 { text-align: center; margin-top: 0; }
-        .search-box { background: var(--gray-100); border: 1px solid var(--gray-200); padding: 15px; border-radius: 10px; margin-bottom: 15px; }
-        .flex { display: flex; gap: 10px; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 15px; }
-        label { font-size: 13px; font-weight: bold; margin-bottom: 4px; display: block; color: #475569; }
-        input, select { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; outline: none; background: #fff; }
-        input:focus, select:focus { border-color: var(--primary); }
-        #map { height: 260px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #cbd5e1; }
-        button { background: var(--primary); color: #fff; border: none; padding: 10px 18px; border-radius: 6px; font-weight: bold; cursor: pointer; }
-        .btn-calc { width: 100%; background: var(--success); padding: 14px; font-size: 16px; margin-top: 10px; }
-        .badge { display: inline-block; background: #e0f2fe; color: #0369a1; padding: 6px 12px; border-radius: 6px; font-size: 14px; font-weight: bold; margin-bottom: 15px; }
-        .result-box { margin-top: 15px; padding: 15px; border-radius: 8px; display: none; }
-        .success { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; }
-        .error { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+        :root {
+            --primary: #0284c7;
+            --primary-hover: #0369a1;
+            --success: #10b981;
+            --dark: #0f172a;
+            --gray-100: #f8fafc;
+            --gray-200: #e2e8f0;
+            --gray-500: #64748b;
+            --gray-600: #475569;
+        }
+
+        * {
+            box-sizing: border-box;
+            font-family: 'Tajawal', sans-serif;
+        }
+
+        body {
+            background: #f1f5f9;
+            margin: 0;
+            padding: 20px 10px;
+            color: var(--dark);
+        }
+
+        .container {
+            max-width: 900px;
+            margin: auto;
+            background: #ffffff;
+            padding: 25px 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid var(--gray-200);
+            padding-bottom: 12px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            color: var(--dark);
+        }
+
+        .header p {
+            margin: 4px 0 0;
+            color: var(--gray-500);
+            font-size: 14px;
+        }
+
+        /* حاوية البحث اللحظي التفاعلي */
+        .search-container {
+            position: relative;
+            margin-bottom: 15px;
+        }
+
+        .search-label {
+            font-weight: 700;
+            font-size: 14px;
+            color: var(--primary);
+            margin-bottom: 6px;
+            display: block;
+        }
+
+        .search-input-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 40px 12px 15px;
+            border: 2px solid #bae6fd;
+            border-radius: 10px;
+            font-size: 15px;
+            outline: none;
+            transition: all 0.2s;
+            background: #f0f9ff;
+        }
+
+        .search-input:focus {
+            border-color: var(--primary);
+            background: #ffffff;
+            box-shadow: 0 0 0 4px rgba(2, 132, 199, 0.15);
+        }
+
+        .search-icon {
+            position: absolute;
+            right: 14px;
+            font-size: 18px;
+            color: var(--primary);
+        }
+
+        /* قائمة الاقتراحات المنبثقة */
+        .suggestions-list {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: #ffffff;
+            border: 1px solid var(--gray-200);
+            border-radius: 10px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.12);
+            max-height: 280px;
+            overflow-y: auto;
+            z-index: 1000;
+            margin-top: 6px;
+            display: none;
+        }
+
+        .suggestion-item {
+            padding: 12px 15px;
+            border-bottom: 1px solid #f1f5f9;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+
+        .suggestion-item:hover {
+            background: #f0f9ff;
+        }
+
+        .suggestion-title {
+            font-weight: 700;
+            font-size: 15px;
+            color: #0f172a;
+            margin-bottom: 2px;
+        }
+
+        .suggestion-subtitle {
+            font-size: 12px;
+            color: var(--gray-500);
+            line-height: 1.4;
+        }
+
+        /* الخريطة */
+        #map {
+            height: 280px;
+            border-radius: 10px;
+            border: 1px solid var(--gray-200);
+            margin-bottom: 15px;
+            z-index: 1;
+        }
+
+        .badge-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #e0f2fe;
+            color: #0369a1;
+            padding: 7px 14px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 15px;
+            border: 1px solid #bae6fd;
+        }
+
+        /* القوائم المنسدلة */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+
+        label {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--gray-600);
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1.5px solid var(--gray-200);
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            background: #fff;
+            transition: border-color 0.2s;
+        }
+
+        select:focus {
+            border-color: var(--primary);
+        }
+
+        /* بطاقة النتيجة التلقائية */
+        .result-box {
+            margin-top: 20px;
+            padding: 18px 24px;
+            border-radius: 12px;
+            display: none;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        .result-box.success {
+            background: #ecfdf5;
+            border: 2px solid #10b981;
+            color: #065f46;
+        }
+
+        .result-box.loading {
+            background: #f0f9ff;
+            border: 1.5px solid #bae6fd;
+            color: #0369a1;
+            display: block;
+        }
+
+        .result-box.error {
+            background: #fef2f2;
+            border: 1.5px solid #fecaca;
+            color: #991b1b;
+        }
+
+        .price-highlight {
+            font-size: 26px;
+            font-weight: 800;
+            color: #047857;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>🚚 حاسبة تكلفة التوصيل (بابل إكسبريس)</h2>
-
-    <!-- 1. البحث النصي -->
-    <div class="search-box">
-        <label>🔍 بحث نصي ذكي (اسم المدينة والشارع):</label>
-        <div class="flex">
-            <input type="text" id="addressInput" placeholder="مثال: دمشق أبو رمانة أو حلب الفرقان">
-            <button onclick="searchAddress()">بحث ومطابقة</button>
-        </div>
-        <div id="searchStatus" style="font-size: 13px; margin-top: 5px;"></div>
+    <div class="header">
+        <h1>🛵 حاسبة أجور التوصيل للزبون</h1>
+        <p>نظام الاستعلام التلقائي والمباشر لمسؤولي المبيعات (بابل إكسبريس)</p>
     </div>
 
-    <!-- 2. الخريطة -->
-    <label>🗺️ أو انقر على الخريطة لتحديد الحي المباشر:</label>
+    <!-- 1. شريط البحث اللحظي التفاعلي -->
+    <div class="search-container">
+        <label class="search-label">🔍 إيجاد حي / منطقة من الخريطة بالبحث اللحظي:</label>
+        <div class="search-input-wrap">
+            <span class="search-icon">📍</span>
+            <input type="text" id="liveSearchInput" class="search-input" placeholder="اكتب اسم الحي، المدينة، أو البلدة (مثال: قنيطرة، الفرقان، الميدان)..." autocomplete="off">
+        </div>
+        <!-- قائمة الاقتراحات المنبثقة -->
+        <div id="suggestionsBox" class="suggestions-list"></div>
+    </div>
+
+    <!-- 2. الخريطة التفاعلية -->
     <div id="map"></div>
 
     <div>
-        <label>الحي المستهدف المحدد:</label>
-        <div id="selectedBadge" class="badge">لم يتم التحديد بعد</div>
+        <label>الموقع المعتمد حالياً:</label>
+        <div id="selectedBadge" class="badge-status">لم يتم تحديد موقع بعد</div>
     </div>
 
-    <!-- 3. القوائم المنسدلة -->
+    <!-- 3. القوائم المنسدلة الثلاثة (تتعبأ تلقائياً) -->
+    <div style="font-weight: 700; color: var(--primary); margin-bottom: 8px;">📋 التقسيم الجغرافي:</div>
     <div class="grid">
         <div>
-            <label>المحافظة / المدينة:</label>
-            <select id="citySelect" onchange="loadAreas()">
+            <label>1. المحافظة / المدينة:</label>
+            <select id="citySelect" onchange="onCityChange()">
                 <option value="">-- اختر المدينة --</option>
             </select>
         </div>
         <div>
-            <label>المنطقة:</label>
-            <select id="areaSelect" onchange="loadNeighbourhoods()" disabled>
+            <label>2. المنطقة الإدارية:</label>
+            <select id="areaSelect" onchange="onAreaChange()" disabled>
                 <option value="">-- اختر المنطقة --</option>
             </select>
         </div>
         <div>
-            <label>الحي:</label>
-            <select id="neighbourhoodSelect" onchange="manualSelectNeighbourhood()" disabled>
+            <label>3. الحي / البلدة:</label>
+            <select id="neighbourhoodSelect" onchange="onNeighbourhoodChange()" disabled>
                 <option value="">-- اختر الحي --</option>
             </select>
         </div>
     </div>
 
-    <!-- 4. مواصفات الطرد -->
-    <div class="grid">
-        <div>
-            <label>نوع الشحنة:</label>
-            <select id="pkgType">
-                <option value="box">طرد / كرتونة</option>
-                <option value="envelope">ظرف وثائق</option>
-            </select>
-        </div>
-        <div>
-            <label>الوزن (كغ):</label>
-            <input type="number" id="pkgWeight" value="1" min="0.5" step="0.5">
-        </div>
-        <div>
-            <label>نوع التسليم:</label>
-            <select id="deliveryType">
-                <option value="address">توصيل للعنوان</option>
-                <option value="hub">استلام من الفرع</option>
-            </select>
-        </div>
-    </div>
-
-    <button class="btn-calc" onclick="calculate()">💰 حساب التكلفة</button>
-
+    <!-- بطاقة النتيجة التلقائية الفورية -->
     <div id="resultBox" class="result-box"></div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    let selectedId = null;
+    let selectedNeighbourhoodId = null;
+    let searchDebounceTimer = null;
 
-    // الاتصال بالسيرفر المحلي
+    // الاتصال مع السيرفر
     async function api(action, data = {}) {
         const res = await fetch(`/api/${action}`, {
             method: 'POST',
@@ -114,125 +315,306 @@
         return await res.json();
     }
 
-    // إعداد الخريطة
+    // ==========================================
+    // 1. إعداد الخريطة
+    // ==========================================
     const map = L.map('map').setView([34.8021, 38.9968], 7);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-    let marker;
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
 
+    let marker = null;
+
+    // النقر المباشر على الخريطة
     map.on('click', async (e) => {
         const { lat, lng } = e.latlng;
+        setMarker(lat, lng);
+        await identifyAndAutoSelectByCoords(lat, lng);
+    });
+
+    function setMarker(lat, lng, zoomLevel = null) {
         if (marker) map.removeLayer(marker);
         marker = L.marker([lat, lng]).addTo(map);
+        if (zoomLevel) {
+            map.setView([lat, lng], zoomLevel);
+        }
+    }
 
-        document.getElementById('selectedBadge').innerText = "⏳ جاري التعرف على الموقع...";
-        const res = await api('findNeighbourhoodByCoordinates', { coordinates: { lat, lng } });
+    // ==========================================
+    // 2. البحث اللحظي وقائمة الاقتراحات (Autocomplete)
+    // ==========================================
+    const searchInput = document.getElementById('liveSearchInput');
+    const suggestionsBox = document.getElementById('suggestionsBox');
 
-        if (res.status === 'success') {
-            selectedId = res.neighbourhood.id;
-            document.getElementById('selectedBadge').innerText = `✅ تم التحديد: ${res.neighbourhood.name}`;
-        } else {
-            document.getElementById('selectedBadge').innerText = "❌ موقع خارج التغطية";
-            selectedId = null;
+    searchInput.addEventListener('input', function() {
+        clearTimeout(searchDebounceTimer);
+        const query = this.value.trim();
+
+        if (query.length < 2) {
+            suggestionsBox.style.display = 'none';
+            return;
+        }
+
+        searchDebounceTimer = setTimeout(() => {
+            fetchLiveSuggestions(query);
+        }, 250);
+    });
+
+    document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !suggestionsBox.contains(e.target)) {
+            suggestionsBox.style.display = 'none';
         }
     });
 
-    // البحث النصي
-    async function searchAddress() {
-        const text = document.getElementById('addressInput').value.trim();
-        const status = document.getElementById('searchStatus');
-        if (!text) return alert("اكتب العنوان أولاً");
+    async function fetchLiveSuggestions(query) {
+        try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=sy&q=${encodeURIComponent(query)}&addressdetails=1&limit=6&accept-language=ar`);
+            const data = await res.json();
 
-        status.innerHTML = "⏳ جاري البحث...";
-        const res = await api('findNeighbourhoodByAddress', { address: text });
+            suggestionsBox.innerHTML = '';
+            if (data && data.length > 0) {
+                data.forEach(item => {
+                    const mainTitle = item.address.suburb || item.address.neighbourhood || item.address.quarter || item.address.village || item.address.town || item.address.city || item.name;
+                    const subTitle = item.display_name;
 
-        if (res.status === 'success') {
-            selectedId = res.neighbourhood.id;
-            status.innerHTML = `<span style="color:#10b981">✅ تم العثور على: ${res.city.name} - ${res.neighbourhood.name}</span>`;
-            document.getElementById('selectedBadge').innerText = `✅ ${res.city.name} - ${res.neighbourhood.name}`;
-        } else {
-            status.innerHTML = `<span style="color:#ef4444">❌ لم يتم العثور على عنوان مطابق</span>`;
+                    const div = document.createElement('div');
+                    div.className = 'suggestion-item';
+                    div.innerHTML = `
+                        <div class="suggestion-title">${mainTitle}</div>
+                        <div class="suggestion-subtitle">${subTitle}</div>
+                    `;
+                    div.onclick = () => {
+                        selectSuggestionItem(item, mainTitle);
+                    };
+                    suggestionsBox.appendChild(div);
+                });
+                suggestionsBox.style.display = 'block';
+            } else {
+                suggestionsBox.innerHTML = '<div class="suggestion-item" style="color:var(--gray-500); font-size:13px;">لا توجد نتائج مطابقة...</div>';
+                suggestionsBox.style.display = 'block';
+            }
+        } catch (err) {
+            console.error("خطأ في جلب الاقتراحات", err);
         }
     }
 
-    // القوائم المنسدلة
+    async function selectSuggestionItem(item, mainTitle) {
+        searchInput.value = mainTitle;
+        suggestionsBox.style.display = 'none';
+        
+        const lat = parseFloat(item.lat);
+        const lng = parseFloat(item.lon);
+        setMarker(lat, lng, 14);
+
+        await identifyAndAutoSelectByCoords(lat, lng, mainTitle);
+    }
+
+    // ==========================================
+    // 3. التعرف على الموقع وتعبئة القوائم وحساب الأجرة فوراً
+    // ==========================================
+    async function identifyAndAutoSelectByCoords(lat, lng, fallbackTitle = "") {
+        document.getElementById('selectedBadge').innerText = "⏳ جاري التعرف ومطابقة المنطقة...";
+        showLoadingPrice();
+
+        try {
+            const resCoords = await api('findNeighbourhoodByCoordinates', { coordinates: { lat, lng } });
+
+            if (resCoords.status === 'success' && resCoords.neighbourhood) {
+                selectedNeighbourhoodId = resCoords.neighbourhood.id;
+                const nName = resCoords.neighbourhood.name;
+
+                const resAddress = await api('findNeighbourhoodByAddress', { address: nName });
+                
+                if (resAddress.status === 'success' && resAddress.city && resAddress.area) {
+                    await populateDropdownsCascade(resAddress.city.id, resAddress.area.id, resCoords.neighbourhood.id);
+                    document.getElementById('selectedBadge').innerText = `✅ ${resAddress.city.name} > ${resAddress.area.name} > ${nName}`;
+                } else {
+                    document.getElementById('selectedBadge').innerText = `✅ الحي المحدد: ${nName}`;
+                }
+
+                // الحساب التلقائي الفوري لأجرة التوصيل
+                await autoCalculateDeliveryFee(selectedNeighbourhoodId);
+
+            } else if (fallbackTitle) {
+                const resAddress = await api('findNeighbourhoodByAddress', { address: fallbackTitle });
+                if (resAddress.status === 'success' && resAddress.neighbourhood) {
+                    selectedNeighbourhoodId = resAddress.neighbourhood.id;
+                    await populateDropdownsCascade(resAddress.city.id, resAddress.area.id, resAddress.neighbourhood.id);
+                    document.getElementById('selectedBadge').innerText = `✅ ${resAddress.city.name} > ${resAddress.area.name} > ${resAddress.neighbourhood.name}`;
+                    
+                    // الحساب التلقائي الفوري لأجرة التوصيل
+                    await autoCalculateDeliveryFee(selectedNeighbourhoodId);
+                } else {
+                    handleOutOfCoverage();
+                }
+            } else {
+                handleOutOfCoverage();
+            }
+        } catch (err) {
+            document.getElementById('selectedBadge').innerText = "❌ خطأ في الاتصال بالسيرفر";
+            hidePriceBox();
+        }
+    }
+
+    function handleOutOfCoverage() {
+        selectedNeighbourhoodId = null;
+        document.getElementById('selectedBadge').innerText = "❌ هذه المنطقة خارج نطاق التغطية حالياً";
+        const resultBox = document.getElementById('resultBox');
+        resultBox.style.display = 'block';
+        resultBox.className = 'result-box error';
+        resultBox.innerHTML = `❌ المنطقة المحددة خارج نطاق التغطية`;
+    }
+
+    async function populateDropdownsCascade(cityId, areaId, neighbourhoodId) {
+        const citySelect = document.getElementById('citySelect');
+        citySelect.value = cityId;
+
+        await loadAreasForCity(cityId);
+        const areaSelect = document.getElementById('areaSelect');
+        areaSelect.value = areaId;
+
+        await loadNeighbourhoodsForArea(areaId);
+        const nSelect = document.getElementById('neighbourhoodSelect');
+        nSelect.value = neighbourhoodId;
+    }
+
+    // ==========================================
+    // 4. القوائم المنسدلة اليدوية
+    // ==========================================
     async function loadCities() {
-        const res = await api('getCities');
-        const select = document.getElementById('citySelect');
-        select.innerHTML = '<option value="">-- اختر المدينة --</option>';
-        if (res.cities) {
-            res.cities.forEach(c => select.innerHTML += `<option value="${c.id}">${c.name}</option>`);
+        try {
+            const data = await api('getCities');
+            const citySelect = document.getElementById('citySelect');
+            citySelect.innerHTML = '<option value="">-- اختر المدينة --</option>';
+            if (data.cities) {
+                data.cities.forEach(c => {
+                    citySelect.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+                });
+            }
+        } catch (err) {
+            console.error("فشل جلب المدن", err);
         }
     }
 
-    async function loadAreas() {
-        const cityID = document.getElementById('citySelect').value;
+    async function onCityChange() {
+        hidePriceBox();
+        const cityId = document.getElementById('citySelect').value;
+        await loadAreasForCity(cityId);
+    }
+
+    async function loadAreasForCity(cityId) {
         const areaSelect = document.getElementById('areaSelect');
         const nSelect = document.getElementById('neighbourhoodSelect');
         areaSelect.innerHTML = '<option value="">-- اختر المنطقة --</option>';
         nSelect.innerHTML = '<option value="">-- اختر الحي --</option>';
         nSelect.disabled = true;
 
-        if (!cityID) return;
-        const res = await api('getAreas', { cityID: parseInt(cityID) });
-        if (res.areas) {
+        if (!cityId) {
+            areaSelect.disabled = true;
+            return;
+        }
+
+        const data = await api('getAreas', { cityID: parseInt(cityId) });
+        if (data.areas) {
             areaSelect.disabled = false;
-            res.areas.forEach(a => areaSelect.innerHTML += `<option value="${a.id}">${a.name}</option>`);
+            data.areas.forEach(a => {
+                areaSelect.innerHTML += `<option value="${a.id}">${a.name}</option>`;
+            });
         }
     }
 
-    async function loadNeighbourhoods() {
-        const areaID = document.getElementById('areaSelect').value;
+    async function onAreaChange() {
+        hidePriceBox();
+        const areaId = document.getElementById('areaSelect').value;
+        await loadNeighbourhoodsForArea(areaId);
+    }
+
+    async function loadNeighbourhoodsForArea(areaId) {
         const nSelect = document.getElementById('neighbourhoodSelect');
         nSelect.innerHTML = '<option value="">-- اختر الحي --</option>';
 
-        if (!areaID) return;
-        const res = await api('getNeighbourhoods', { areaID: parseInt(areaID) });
-        if (res.neighbourhoods) {
+        if (!areaId) {
+            nSelect.disabled = true;
+            return;
+        }
+
+        const data = await api('getNeighbourhoods', { areaID: parseInt(areaId) });
+        if (data.neighbourhoods) {
             nSelect.disabled = false;
-            res.neighbourhoods.forEach(n => nSelect.innerHTML += `<option value="${n.id}">${n.name}</option>`);
+            data.neighbourhoods.forEach(n => {
+                nSelect.innerHTML += `<option value="${n.id}">${n.name}</option>`;
+            });
         }
     }
 
-    function manualSelectNeighbourhood() {
+    // عند اختيار الحي يدوياً من القائمة المنسدلة: حساب فوري
+    async function onNeighbourhoodChange() {
         const nSelect = document.getElementById('neighbourhoodSelect');
         if (nSelect.value) {
-            selectedId = parseInt(nSelect.value);
-            document.getElementById('selectedBadge').innerText = `✅ القائمة: ${nSelect.options[nSelect.selectedIndex].text}`;
+            selectedNeighbourhoodId = parseInt(nSelect.value);
+            const name = nSelect.options[nSelect.selectedIndex].text;
+            document.getElementById('selectedBadge').innerText = `✅ تم الاختيار يدوياً: ${name}`;
+            
+            // حساب فوري وتلقائي
+            await autoCalculateDeliveryFee(selectedNeighbourhoodId);
         }
     }
 
-    // حساب التكلفة
-    async function calculate() {
-        const result = document.getElementById('resultBox');
-        if (!selectedId) return alert("يرجى اختيار الحي أولاً");
-
-        result.style.display = 'block';
-        result.className = 'result-box';
-        result.innerHTML = '⏳ جاري احتساب التكلفة...';
+    // ==========================================
+    // 5. الحساب التلقائي وإظهار أجرة التوصيل فقط (Dropoff)
+    // ==========================================
+    async function autoCalculateDeliveryFee(neighbourhoodId) {
+        const resultBox = document.getElementById('resultBox');
+        showLoadingPrice();
 
         const payload = {
             delivery: {
-                receiver: { neighbourhood: { id: selectedId } },
-                type: document.getElementById('pkgType').value,
-                parts: [{ weight: parseFloat(document.getElementById('pkgWeight').value) }],
-                deliveryType: document.getElementById('deliveryType').value,
+                receiver: {
+                    neighbourhood: { id: parseInt(neighbourhoodId) }
+                },
+                type: "box",
+                parts: [{ weight: 1 }],
+                deliveryType: "address",
                 payer: "receiver"
             }
         };
 
-        const res = await api('calculatePrice', payload);
-        if (res.status === 'success') {
-            result.className = 'result-box success';
-            result.innerHTML = `
-                <h3 style="margin:0 0 8px 0;">🎉 كلفة التوصيل: ${res.price.toLocaleString()} ${res.currency}</h3>
-                <div>أجور الشحن: ${res.details.shipping.toLocaleString()} | أجور التوصيل: ${res.details.dropoff.toLocaleString()}</div>
-            `;
-        } else {
-            result.className = 'result-box error';
-            result.innerHTML = `❌ ${res.errorMessage || 'المنطقة غير مدعومة'}`;
+        try {
+            const data = await api('calculatePrice', payload);
+            if (data.status === 'success') {
+                // استخراج أجور التوصيل فقط (Dropoff)
+                const deliveryFee = data.details && data.details.dropoff !== undefined ? data.details.dropoff : 0;
+
+                resultBox.className = 'result-box success';
+                resultBox.innerHTML = `
+                    <div style="font-size: 14px; font-weight: 700; color: #065f46; margin-bottom: 4px;">🛵 أجور التوصيل إلى عنوان الزبون:</div>
+                    <div class="price-highlight">
+                        ${deliveryFee.toLocaleString()} <span style="font-size: 18px;">${data.currency}</span>
+                    </div>
+                `;
+            } else {
+                resultBox.className = 'result-box error';
+                resultBox.innerHTML = `❌ ${data.errorMessage || 'المنطقة غير مدعومة حالياً'}`;
+            }
+        } catch (err) {
+            resultBox.className = 'result-box error';
+            resultBox.innerHTML = '❌ فشل احتساب أجرة التوصيل';
         }
     }
 
+    function showLoadingPrice() {
+        const resultBox = document.getElementById('resultBox');
+        resultBox.style.display = 'block';
+        resultBox.className = 'result-box loading';
+        resultBox.innerHTML = '⏳ جاري جلب أجرة التوصيل للعنوان...';
+    }
+
+    function hidePriceBox() {
+        const resultBox = document.getElementById('resultBox');
+        resultBox.style.display = 'none';
+    }
+
+    // تحميل المدن عند فتح الصفحة
     loadCities();
 </script>
 </body>
