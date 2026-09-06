@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة التاجر المتطورة - إدارة وتجهيز الشحنات</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+    <!-- مكتبة مسح الباركود بالكاميرا والصور -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+    <style>
+        :root {
+            --primary: #0284c7;
+            --primary-hover: #0369a1;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --dark: #0f172a;
+            --gray-100: #f8fafc;
+            --gray-200: #e2e8f0;
+            --gray-600: #475569;
+        }
+
+        * {
+            box-sizing: border-box;
+            font-family: 'Tajawal', sans-serif;
+        }
+
+        body {
+            background: #f1f5f9;
+            margin: 0;
+            padding: 15px 10px;
+            color: var(--dark);
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: auto;
+            background: #ffffff;
+            padding: 25px 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 25px rgba(0,0,0,0.07);
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--gray-200);
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 22px;
+            color: var(--dark);
+        }
+
+        /* شريط التبويبات */
+        .tabs-nav {
+            display: flex;
+            gap: 8px;
+            background: var(--gray-100);
+            padding: 6px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border: 1px solid var(--gray-200);
+            overflow-x: auto;
+        }
+
+        .tab-btn {
+            flex: 1;
+            min-width: 150px;
+            padding: 11px 16px;
+            border: none;
+            background: transparent;
+            font-size: 14px;
+            font-weight: 800;
+            color: var(--gray-600);
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .tab-btn.active {
+            background: var(--primary);
+            color: #ffffff;
+            box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25);
+        }
+
+        /* صندوق الإدخال الجماعي */
+        .bulk-textarea {
+            width: 100%;
+            height: 180px;
+            padding: 14px;
+            border: 2px dashed #93c5fd;
+            border-radius: 12px;
+            font-size: 14px;
+            outline: none;
+            resize: vertical;
+            background: #f0f9ff;
+            line-height: 1.6;
+        }
+
+        .bulk-textarea:focus {
+            border-color: var(--primary);
+            background: #fff;
+        }
+
+        .btn-parse {
+            width: 100%;
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 800;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: 0.2s;
+        }
+
+        .btn-parse:hover {
+            background: var(--primary-hover);
+        }
+
+        /* تصميم البطاقات */
+        .cards-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-top: 15px;
+        }
+
+        .order-card {
+            background: #ffffff;
+            border: 1.5px solid var(--gray-200);
+            border-radius: 14px;
+            padding: 20px;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.04);
+            position: relative;
+            transition: border-color 0.2s;
+        }
+
+        .order-card.has-alert {
+            border-color: var(--warning);
+            background: #fffdfa;
+        }
+
+        .card-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 10px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .marketer-tag {
+            background: #e0f2fe;
+            color: #0369a1;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .niche-tag {
+            background: #fef3c7;
+            color: #92400e;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .alert-banner {
+            background: #fffbeb;
+            border: 1.5px solid #fde68a;
+            color: #b45309;
+            padding: 9px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .grid-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            font-size: 14px;
+            margin-bottom: 14px;
+        }
+
+        .info-item {
+            background: var(--gray-100);
+            padding: 8px 12px;
+            border-radius: 8px;
+        }
+
+        .info-label {
+            font-size: 11px;
+            color: var(--gray-600);
+            font-weight: 700;
+            display: block;
+            margin-bottom: 2px;
+        }
+
+        .info-val {
+            font-weight: 800;
+            color: var(--dark);
+        }
+
+        /* الباركود والماسح */
+        .barcode-section {
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 10px 14px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .barcode-badges {
+            display: flex;
+            gap: 8px;
+        }
+
+        .b-badge {
+            background: #e2e8f0;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .btn-scan {
+            background: #475569;
+            color: white;
+            border: none;
+            padding: 7px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .card-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn-approve {
+            background: var(--success);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .btn-approve:hover { background: #059669; }
+
+        .btn-delete {
+            background: #fee2e2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .btn-delete:hover { background: #fca5a5; }
+
+        .select-origin {
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1.5px solid #cbd5e1;
+            font-size: 13px;
+            font-weight: 700;
+            background: #fff;
+        }
+
+        /* نافذة التأكيد المنبثقة (Modal) */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15, 23, 42, 0.6);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            padding: 15px;
+        }
+
+        .modal-card {
+            background: white;
+            padding: 25px;
+            border-radius: 16px;
+            max-width: 450px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .modal-btns {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .btn-confirm {
+            background: var(--success);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .btn-cancel {
+            background: var(--gray-200);
+            color: var(--dark);
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        /* إحصائيات المسوقات */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: var(--gray-100);
+            padding: 16px;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid var(--gray-200);
+        }
+
+        .stat-num {
+            font-size: 24px;
+            font-weight: 900;
+            margin-top: 4px;
+        }
+
+        #scannerModalReader {
+            width: 100%;
+            max-width: 400px;
+            margin: auto;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <div>
+            <h1>📦 لوحة إدارة ومعالجة الطلبات المركزية (التاجر)</h1>
+            <div style="font-size:13px; color:var(--gray-600); margin-top:3px;">نظام الفرز المالي، مسح الباركودات، ومحاسبة المسوقات</div>
+        </div>
+        <div id="dbLiveIndicator" style="font-size:12px; font-weight:700; color:var(--success);">🟢 متصل بـ MongoDB</div>
+    </div>
+
+    <!-- التبويبات العلوية -->
+    <div class="tabs-nav">
+        <button class="tab-btn active" onclick="switchTab('parseTab')">📥 تحليل ولصق الطلبات</button>
+        <button class="tab-btn" onclick="switchTab('pendingTab')">📋 قيد المراجعة (<span id="pendingCountBadge">0</span>)</button>
+        <button class="tab-btn" onclick="switchTab('sentTab')">🚚 الطلبات المرسلة والتتبع</button>
+        <button class="tab-btn" onclick="switchTab('marketersTab')">👩‍💼 حسابات المسوقات</button>
+    </div>
+
+    <!-- ==========================================
+         التبويب 1: إدخال وتحليل الطلبات جماعياً
+         ========================================== -->
+    <div id="parseTab" class="tab-content">
+        <label style="font-weight:800; font-size:14px; margin-bottom:6px; display:block;">
+            📋 الصق رسائل الواتساب هنا (يقبل حتى 100 طلب دفعة واحدة مفصولة بـ #طلب_توصيل):
+        </label>
+        <textarea id="bulkInput" class="bulk-textarea" placeholder="#طلب_توصيل
+كود المسوقة/مسوق: 0039
+المجال: بديل ذهب
+القطع وعددها: 1 طقم كذا، 1 خاتم كذا.
+اسم الزبون: محمد عمر الشعار
+رقم الزبون: 0955555555
+العنوان: ريف دمشق - كفر بطنا - عين ترما
+اجرة التوصيل: 27500
+تكلفة مع توصيل: 250000
+النسبة: 80000
+ملاحظات الزبون: التوصيل بعد الساعة 6 المسا"></textarea>
+        
+        <button class="btn-parse" onclick="startBulkAnalysis()">⚡ تحليل جميع الطلبات وتوليد بطاقات المراجعة</button>
+    </div>
+
+    <!-- ==========================================
+         التبويب 2: بطاقات قيد المراجعة
+         ========================================== -->
+    <div id="pendingTab" class="tab-content" style="display:none;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <h3 style="margin:0;">طلبات قيد المراجعة والتدقيق المالي</h3>
+            <button onclick="clearAllPending()" style="background:transparent; border:none; color:var(--danger); font-weight:800; cursor:pointer;">مسح الكل</button>
+        </div>
+        <div id="pendingCardsList" class="cards-grid">
+            <div style="text-align:center; padding:30px; color:var(--gray-600);">لا توجد طلبات قيد المراجعة حالياً. الصق الطلبات في التبويب الأول.</div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         التبويب 3: الطلبات المرسلة والتتبع المباشر
+         ========================================== -->
+    <div id="sentTab" class="tab-content" style="display:none;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <h3 style="margin:0;">سجل الشحنات المصدرة إلى بابل إكسبريس</h3>
+            <button class="btn-scan" onclick="loadSentOrders()">🔄 تحديث القائمة</button>
+        </div>
+        <div id="sentOrdersList" class="cards-grid"></div>
+    </div>
+
+    <!-- ==========================================
+         التبويب 4: حسابات وأرباح المسوقات
+         ========================================== -->
+    <div id="marketersTab" class="tab-content" style="display:none;">
+        <div style="background:var(--gray-100); padding:15px; border-radius:12px; margin-bottom:20px; border:1px solid var(--gray-200);">
+            <label style="font-weight:800; margin-bottom:6px; display:block;">اختر كود المسوقة للاستعلام والمحاسبة:</label>
+            <div style="display:flex; gap:10px;">
+                <input type="text" id="searchMarketerCode" placeholder="اكتب كود المسوقة (مثال: 0039)" style="flex:1; padding:11px; border-radius:8px; border:1.5px solid var(--gray-200); font-size:14px;">
+                <button onclick="loadMarketerReport()" style="background:var(--primary); color:white; border:none; padding:10px 20px; border-radius:8px; font-weight:800; cursor:pointer;">عرض الحساب</button>
+            </div>
+        </div>
+
+        <div id="marketerReportArea" style="display:none;">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div style="font-size:12px; color:var(--gray-600); font-weight:700;">إجمالي الطلبات</div>
+                    <div id="mTotal" class="stat-num">0</div>
+                </div>
+                <div class="stat-card" style="border-color:#a7f3d0; background:#f0fdf4;">
+                    <div style="font-size:12px; color:#065f46; font-weight:700;">تم التسليم بنجاح</div>
+                    <div id="mDelivered" class="stat-num" style="color:#047857;">0</div>
+                </div>
+                <div class="stat-card" style="border-color:#fecaca; background:#fef2f2;">
+                    <div style="font-size:12px; color:#991b1b; font-weight:700;">مرتجعات</div>
+                    <div id="mReturned" class="stat-num" style="color:#dc2626;">0</div>
+                </div>
+                <div class="stat-card" style="border-color:#fed7aa; background:#fff7ed;">
+                    <div style="font-size:12px; color:#9a3412; font-weight:700;">في الطريق / معلق</div>
+                    <div id="mInTransit" class="stat-num" style="color:#ea580c;">0</div>
+                </div>
+            </div>
+
+            <!-- بطاقة المستحقات والتصفير -->
+            <div style="background:#ecfdf5; border:2px solid #10b981; padding:20px; border-radius:12px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                <div>
+                    <div style="font-size:14px; font-weight:700; color:#065f46;">💰 مجموع النسب المستحقة للدفع (للطلبات المسلمة فقط):</div>
+                    <div id="mUnpaidCommission" style="font-size:28px; font-weight:900; color:#047857; margin-top:4px;">0 ل.س</div>
+                </div>
+                <button onclick="promptSettleCommission()" style="background:#047857; color:white; border:none; padding:13px 22px; border-radius:10px; font-size:16px; font-weight:800; cursor:pointer;">
+                    💳 تصفير وتأكيد دفع النسب للمسوقة
+                </button>
+            </div>
+
+            <h4>سجل طلبات هذه المسوقة:</h4>
+            <div id="marketerOrdersList" class="cards-grid"></div>
+        </div>
+    </div>
+</div>
+
+<!-- النافذة المنبثقة لتأكيد تصفير النسب -->
+<div id="settleModal" class="modal-overlay">
+    <div class="modal-card">
+        <h3 style="margin-top:0; color:var(--dark);">⚠️ تأكيد عملية تصفير ودفع النسب</h3>
+        <p id="settleModalText" style="font-size:14px; color:var(--gray-600); line-height:1.5;"></p>
+        <div class="modal-btns">
+            <button class="btn-confirm" onclick="confirmSettleCommission()">نعم، تأكيد الدفع</button>
+            <button class="btn-cancel" onclick="closeSettleModal()">تراجع</button>
+        </div>
+    </div>
+</div>
+
+<!-- النافذة المنبثقة لماسح الباركود بالكاميرا والصور -->
+<div id="scannerModal" class="modal-overlay">
+    <div class="modal-card" style="max-width:480px;">
+        <h3 style="margin-top:0;">📷 مسح باركود الشحنة (PB-XXXXXX-XXXXX)</h3>
+        <div id="scannerModalReader"></div>
+        <div style="margin-top:15px;">
+            <label style="font-size:13px; font-weight:700;">أو رفع صورة الباركود من الجهاز:</label>
+            <input type="file" id="barcodeFileInput" accept="image/*" style="margin-top:5px; width:100%;">
+        </div>
+        <div class="modal-btns" style="margin-top:15px;">
+            <button class="btn-cancel" onclick="closeScannerModal()">إغلاق الماسح</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let allNeighbourhoodsList = [];
+    let pendingOrders = [];
+    let activeScanningCardIndex = null;
+    let html5QrScanner = null;
+    let currentMarketerReportCode = "";
+    let currentMarketerDueAmount = 0;
+
+    // الاتصال بالسيرفر
+    async function api(action, data = {}, method = 'POST') {
+        const options = {
+            method: method,
+            headers: { 'Content-Type': 'application/json' }
+        };
+        if (method === 'POST') options.body = JSON.stringify(data);
+        const res = await fetch(`/api/${action}`, options);
+        return await res.json();
+    }
+
+    // تهيئة الشجرة الجغرافية
+    async function initTree() {
+        try {
+            const res = await fetch('/api/locations-tree');
+            const data = await res.json();
+            if (data.status === 'success' && data.data) {
+                allNeighbourhoodsList = data.data.neighbourhoods || [];
+            }
+        } catch (e) {}
+    }
+
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById(tabId).style.display = 'block';
+        event.currentTarget.classList.add('active');
+
+        if (tabId === 'sentTab') loadSentOrders();
+    }
+
+    // ==========================================
+    // 1. محرك التحليل اللحظي (Bulk Parser)
+    // ==========================================
+    function normalizeAr(str) {
+        if (!str) return '';
+        return str.toString().trim()
+            .replace(/[\u064B-\u065F\u0670]/g, '')
+            .replace(/[إأآا]/g, 'ا')
+            .replace(/ة/g, 'ه')
+            .replace(/ى/g, 'ي');
+    }
+
+    async function startBulkAnalysis() {
+        const rawText = document.getElementById('bulkInput').value.trim();
+        if (!rawText) return alert("يرجى لصق نص الطلبات أولاً!");
+
+        // تقسيم الطلبات بالاعتماد على وسم #طلب_توصيل أو #
+        const rawOrders = rawText.split(/(?=#طلب_توصيل|#طلب)/g).map(t => t.trim()).filter(t => t.length > 10);
+        if (rawOrders.length === 0) return alert("لم يتم العثور على صيغة #طلب_توصيل في النص الملصوق!");
+
+        alert(`⏳ جاري تحليل ${rawOrders.length} طلب وحساب التكاليف الفعلية ومطابقة الأحياء...`);
+
+        for (let text of rawOrders) {
+            const parsed = parseSingleOrderText(text);
+            await matchAndCalculateOrder(parsed);
+            pendingOrders.push(parsed);
+        }
+
+        renderPendingCards();
+        document.getElementById('pendingCountBadge').innerText = pendingOrders.length;
+        switchTabDirect('pendingTab', 1);
+        document.getElementById('bulkInput').value = '';
+    }
+
+    function switchTabDirect(tabId, btnIndex) {
+        document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById(tabId).style.display = 'block';
+        document.querySelectorAll('.tab-btn')[btnIndex].classList.add('active');
+    }
+
+    function parseSingleOrderText(text) {
+        const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        let obj = {
+            marketerCode: "",
+            niche: "بديل ذهب",
+            itemsText: "",
+            customerName: "",
+            customerPhone: "",
+            customerAddress: "",
+            statedDeliveryFee: 0,
+            actualDeliveryFee: 0,
+            totalWithDelivery: 0,
+            commission: 0,
+            netMerchantAmount: 0,
+            codAmount: 0,
+            customerNotes: "",
+            originBranch: "دمشق",
+            barcodeRaw: "",
+            barcodeSerial: "",
+            barcodeCode: "",
+            neighbourhoodId: null,
+            cityName: "",
+            areaName: "",
+            neighbourhoodName: "",
+            hasFeeAlert: false
+        };
+
+        lines.forEach(line => {
+            const clean = line.replace(/[*_#]/g, '');
+            if (clean.includes('كود المسوقة') || clean.includes('كود المسوق') || clean.includes('كود:')) {
+                obj.marketerCode = clean.split(/[:：]/)[1]?.trim() || "";
+            } else if (clean.includes('المجال:')) {
+                obj.niche = clean.split(/[:：]/)[1]?.trim() || "بديل ذهب";
+            } else if (clean.includes('القطع وعددها:')) {
+                obj.itemsText = clean.split(/[:：]/)[1]?.trim() || "";
+            } else if (clean.includes('اسم الزبون:') || clean.includes('الاسم:')) {
+                obj.customerName = clean.split(/[:：]/)[1]?.trim() || "";
+            } else if (clean.includes('رقم الزبون:') || clean.includes('الرقم:') || clean.includes('الهاتف:')) {
+                let p = clean.split(/[:：]/)[1]?.trim() || "";
+                p = p.replace(/[^0-9]/g, '');
+                if (p.startsWith('963')) p = '0' + p.substring(3);
+                obj.customerPhone = p;
+            } else if (clean.includes('العنوان:')) {
+                obj.customerAddress = clean.split(/[:：]/)[1]?.trim() || "";
+            } else if (clean.includes('اجرة التوصيل:') || clean.includes('أجرة التوصيل:')) {
+                obj.statedDeliveryFee = parseFloat(clean.replace(/[^0-9]/g, '')) || 0;
+            } else if (clean.includes('تكلفة مع توصيل:') || clean.includes('التكلفة مع التوصيل:')) {
+                obj.totalWithDelivery = parseFloat(clean.replace(/[^0-9]/g, '')) || 0;
+            } else if (clean.includes('النسبة:')) {
+                obj.commission = parseFloat(clean.replace(/[^0-9]/g, '')) || 0;
+            } else if (clean.includes('ملاحظات الزبون:') || clean.includes('ملاحظات:')) {
+                obj.customerNotes = clean.split(/[:：]/)[1]?.trim() || "";
+            }
+        });
+
+        return obj;
+    }
+
+    async function matchAndCalculateOrder(order) {
+        // 1. مطابقة الحي من العنوان المكتوب
+        const normAddr = normalizeAr(order.customerAddress);
+        let matched = null;
+
+        for (let item of allNeighbourhoodsList) {
+            const normN = normalizeAr(item.name);
+            if (normN.length >= 3 && normAddr.includes(normN)) {
+                matched = item;
+                break;
+            }
+        }
+
+        if (matched) {
+            order.neighbourhoodId = matched.id;
+            order.neighbourhoodName = matched.name;
+            order.cityName = matched.cityName;
+            order.areaName = matched.areaName;
+
+            // 2. حساب كلفة التوصيل الفعلية عبر API بابل
+            try {
+                const res = await api('calculatePrice', {
+                    delivery: {
+                        receiver: { neighbourhood: { id: matched.id } },
+                        type: "envelope",
+                        parts: [{ weight: 1 }],
+                        deliveryType: "address",
+                        payer: "receiver"
+                    }
+                });
+
+                if (res.status === 'success') {
+                    const localBranches = ["دمشق", "طرطوس", "ريف دمشق"];
+                    const isLocal = localBranches.some(b => matched.cityName.includes(b));
+
+                    if (isLocal) {
+                        order.actualDeliveryFee = res.details?.dropoff || res.price || 0;
+                    } else {
+                        order.actualDeliveryFee = res.price || 0;
+                    }
+                }
+            } catch (e) {
+                order.actualDeliveryFee = order.statedDeliveryFee;
+            }
+        } else {
+            order.actualDeliveryFee = order.statedDeliveryFee;
+        }
+
+        // 3. التحقق من فرق كلفة التوصيل
+        if (order.statedDeliveryFee > 0 && order.actualDeliveryFee > 0 && order.statedDeliveryFee !== order.actualDeliveryFee) {
+            order.hasFeeAlert = true;
+        }
+
+        // 4. تطبيق المعادلات المالية المعتمدة
+        // مبلغ الدفع عند الاستلام = التكلفة مع توصيل مطروحة من كلفة التوصيل الفعلية
+        order.codAmount = Math.max(0, order.totalWithDelivery - order.actualDeliveryFee);
+        // صافي البضاعة للتاجر = التكلفة مع توصيل - النسبة - كلفة التوصيل الفعلية
+        order.netMerchantAmount = Math.max(0, order.totalWithDelivery - order.commission - order.actualDeliveryFee);
+    }
+
+    // ==========================================
+    // 2. بطاقات طلبات قيد المراجعة
+    // ==========================================
+    function renderPendingCards() {
+        const container = document.getElementById('pendingCardsList');
+        if (pendingOrders.length === 0) {
+            container.innerHTML = '<div style="text-align:center; padding:30px; color:var(--gray-600);">لا توجد طلبات قيد المراجعة.</div>';
+            return;
+        }
+
+        container.innerHTML = '';
+        pendingOrders.forEach((o, index) => {
+            const card = document.createElement('div');
+            card.className = `order-card ${o.hasFeeAlert ? 'has-alert' : ''}`;
+            card.innerHTML = `
+                <div class="card-top">
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <span class="marketer-tag">👩‍💼 كود: ${o.marketerCode || 'غير محدد'}</span>
+                        <span class="niche-tag">🏷️ ${o.niche || 'بديل ذهب'}</span>
+                    </div>
+                    <div>
+                        <label style="font-size:12px; font-weight:800; margin-left:6px;">مركز الإرسال:</label>
+                        <select class="select-origin" onchange="pendingOrders[${index}].originBranch = this.value">
+                            <option value="دمشق" ${o.originBranch === 'دمشق' ? 'selected' : ''}>🏢 مستودع دمشق</option>
+                            <option value="طرطوس" ${o.originBranch === 'طرطوس' ? 'selected' : ''}>🏢 مستودع طرطوس</option>
+                        </select>
+                    </div>
+                </div>
+
+                ${o.hasFeeAlert ? `
+                    <div class="alert-banner">
+                        ⚠️ <strong>تنبيه مالي:</strong> المسوقة سجلت التوصيل (${o.statedDeliveryFee.toLocaleString()} ل.س) بينما التوصيل الفعلي لدى بابل هو (${o.actualDeliveryFee.toLocaleString()} ل.س) - تم اعتماد التوصيل الفعلي في المعادلات.
+                    </div>
+                ` : ''}
+
+                <div class="grid-info">
+                    <div class="info-item"><span class="info-label">اسم الزبون:</span><span class="info-val">${o.customerName}</span></div>
+                    <div class="info-item"><span class="info-label">رقم الزبون:</span><span class="info-val">${o.customerPhone}</span></div>
+                    <div class="info-item"><span class="info-label">العنوان التفصيلي:</span><span class="info-val">${o.customerAddress}</span></div>
+                    <div class="info-item"><span class="info-label">الحي المعترف به بابل:</span><span class="info-val">${o.neighbourhoodName || 'لم يتم العثور بدقة'}</span></div>
+                </div>
+
+                <div class="grid-info" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px;">
+                    <div class="info-item"><span class="info-label">المبلغ الكلي مع التوصيل:</span><span class="info-val">${o.totalWithDelivery.toLocaleString()} ل.س</span></div>
+                    <div class="info-item"><span class="info-label">كلفة التوصيل المعتمدة:</span><span class="info-val" style="color:#0284c7;">${o.actualDeliveryFee.toLocaleString()} ل.س</span></div>
+                    <div class="info-item"><span class="info-label">💵 الدفع عند الاستلام (التحصيل الصافي):</span><span class="info-val" style="color:#047857; font-size:16px;">${o.codAmount.toLocaleString()} ل.س</span></div>
+                    <div class="info-item"><span class="info-label">نسبة المسوقة:</span><span class="info-val">${o.commission.toLocaleString()} ل.س</span></div>
+                    <div class="info-item"><span class="info-label">صافي البضاعة للتاجر:</span><span class="info-val" style="color:#1e293b;">${o.netMerchantAmount.toLocaleString()} ل.س</span></div>
+                </div>
+
+                <!-- مساحة الباركود -->
+                <div class="barcode-section">
+                    <div>
+                        <div style="font-size:12px; font-weight:800; margin-bottom:4px;">بيانات الباركود الممسوح:</div>
+                        <div class="barcode-badges">
+                            <span class="b-badge">الرقم التسلسلي: <strong id="serial_${index}">${o.barcodeSerial || 'لم يمسح'}</strong></span>
+                            <span class="b-badge">الرمز: <strong id="code_${index}">${o.barcodeCode || 'لم يمسح'}</strong></span>
+                        </div>
+                    </div>
+                    <button class="btn-scan" onclick="openScannerModal(${index})">📷 مسح الباركود (كاميرا / صورة)</button>
+                </div>
+
+                <div class="card-actions">
+                    <button class="btn-delete" onclick="deletePendingOrder(${index})">🗑️ حذف الطلب</button>
+                    <button class="btn-approve" onclick="approveAndSubmitOrder(${index})">🚀 موافقة وتصدير إلى بابل إكسبريس</button>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    function deletePendingOrder(index) {
+        pendingOrders.splice(index, 1);
+        document.getElementById('pendingCountBadge').innerText = pendingOrders.length;
+        renderPendingCards();
+    }
+
+    function clearAllPending() {
+        if (!confirm("هل أنت متأكد من مسح جميع طلبات المراجعة؟")) return;
+        pendingOrders = [];
+        document.getElementById('pendingCountBadge').innerText = 0;
+        renderPendingCards();
+    }
+
+    // ==========================================
+    // 3. ماسح الباركود (PB-XXXXXX-XXXXX)
+    // ==========================================
+    function openScannerModal(index) {
+        activeScanningCardIndex = index;
+        document.getElementById('scannerModal').style.display = 'flex';
+
+        html5QrScanner = new Html5Qrcode("scannerModalReader");
+        html5QrScanner.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 250, height: 150 } },
+            onScanSuccess,
+            () => {}
+        ).catch(() => {});
+
+        document.getElementById('barcodeFileInput').onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            html5QrScanner.scanFile(file, true)
+                .then(decodedText => onScanSuccess(decodedText))
+                .catch(() => alert("تعذر قراءة الباركود من الصورة المرفوعة!"));
+        };
+    }
+
+    function onScanSuccess(decodedText) {
+        // فك تشفير PB-164474-XUUYG
+        const parts = decodedText.split('-');
+        let serial = "";
+        let code = "";
+
+        if (parts.length >= 3) {
+            serial = parts[1];
+            code = parts[2];
+        } else if (parts.length === 2) {
+            serial = parts[0];
+            code = parts[1];
+        } else {
+            serial = decodedText;
+        }
+
+        if (activeScanningCardIndex !== null) {
+            pendingOrders[activeScanningCardIndex].barcodeRaw = decodedText;
+            pendingOrders[activeScanningCardIndex].barcodeSerial = serial;
+            pendingOrders[activeScanningCardIndex].barcodeCode = code;
+            document.getElementById(`serial_${activeScanningCardIndex}`).innerText = serial;
+            document.getElementById(`code_${activeScanningCardIndex}`).innerText = code;
+        }
+
+        closeScannerModal();
+    }
+
+    function closeScannerModal() {
+        if (html5QrScanner) {
+            html5QrScanner.stop().then(() => html5QrScanner.clear()).catch(() => {});
+        }
+        document.getElementById('scannerModal').style.display = 'none';
+        activeScanningCardIndex = null;
+    }
+
+    // ==========================================
+    // 4. الموافقة والتصدير إلى بابل إكسبريس (createShipment)
+    // ==========================================
+    async function approveAndSubmitOrder(index) {
+        const o = pendingOrders[index];
+        if (!o.neighbourhoodId) {
+            return alert("لا يمكن التصدير: لم يتم العثور على معرّف الحي بدقة في سيستم بابل!");
+        }
+
+        const btn = event.currentTarget;
+        btn.innerText = "⏳ جاري التصدير إلى بابل...";
+        btn.disabled = true;
+
+        let phone = o.customerPhone.replace(/\s+/g, '').replace('+963', '').replace(/^0/, '');
+
+        const payload = {
+            shipment: {
+                receiver: {
+                    name: o.customerName,
+                    phone: { country: "963", phone: phone },
+                    address: o.customerAddress,
+                    neighbourhood: { id: parseInt(o.neighbourhoodId) }
+                },
+                type: "envelope",
+                parts: [{ weight: 1 }],
+                contents: o.niche || "بديل ذهب",
+                deliveryType: "address",
+                pickupType: "hub", // الاستلام من المركز الأقرب للتاجر
+                reference: "",
+                cod: {
+                    amount: o.codAmount,
+                    currency: "SYP"
+                },
+                payer: "receiver"
+            }
+        };
+
+        try {
+            const res = await api('createShipment', payload);
+            if (res.status === 'success' && res.awb) {
+                o.awb = res.awb;
+                o.orderStatus = "sent";
+                o.shipmentStatusText = "تم تكوين الشحنة";
+
+                // حفظ في MongoDB
+                await api('orders/save', o);
+
+                alert(`🎉 تم تصدير الشحنة بنجاح إلى بابل إكسبريس!\nرقم البوليصة (AWB): ${res.awb}`);
+                pendingOrders.splice(index, 1);
+                document.getElementById('pendingCountBadge').innerText = pendingOrders.length;
+                renderPendingCards();
+            } else {
+                alert(`❌ فشل التصدير لبابل: ${res.errorMessage || 'تحقق من البيانات'}`);
+                btn.innerText = "🚀 موافقة وتصدير إلى بابل إكسبريس";
+                btn.disabled = false;
+            }
+        } catch (e) {
+            alert("❌ خطأ في الاتصال بالخادم.");
+            btn.innerText = "🚀 موافقة وتصدير إلى بابل إكسبريس";
+            btn.disabled = false;
+        }
+    }
+
+    // ==========================================
+    // 5. الطلبات المرسلة والتتبع المباشر
+    // ==========================================
+    async function loadSentOrders() {
+        const container = document.getElementById('sentOrdersList');
+        container.innerHTML = '<div style="text-align:center; padding:20px;">⏳ جاري جلب الطلبات المرسلة من قاعدة البيانات...</div>';
+
+        try {
+            const res = await fetch('/api/orders');
+            const data = await res.json();
+            const sent = (data.orders || []).filter(o => o.orderStatus !== 'pending');
+
+            if (sent.length === 0) {
+                container.innerHTML = '<div style="text-align:center; padding:30px; color:var(--gray-600);">لا توجد شحنات مرسلة حتى الآن.</div>';
+                return;
+            }
+
+            container.innerHTML = '';
+            sent.forEach(o => {
+                let badgeColor = "#0284c7";
+                if (o.orderStatus === 'delivered' || o.shipmentStatusText.includes('تم التسليم')) badgeColor = "#10b981";
+                if (o.orderStatus === 'returned' || o.shipmentStatusText.includes('مرتجع')) badgeColor = "#ef4444";
+
+                const card = document.createElement('div');
+                card.className = 'order-card';
+                card.innerHTML = `
+                    <div class="card-top">
+                        <div>
+                            <span class="marketer-tag">👩‍💼 ${o.marketerCode}</span>
+                            <strong style="margin-right:10px;">${o.customerName}</strong> (${o.customerPhone})
+                        </div>
+                        <div style="font-size:13px; font-weight:800; background:#f1f5f9; padding:4px 10px; border-radius:6px;">
+                            AWB: <span style="color:#0284c7;">${o.awb}</span>
+                        </div>
+                    </div>
+
+                    <div style="font-size:13px; margin-bottom:10px;">📍 ${o.customerAddress}</div>
+                    
+                    <div style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc; padding:10px 14px; border-radius:8px; border:1px solid #e2e8f0; flex-wrap:wrap; gap:8px;">
+                        <div>
+                            الحالة الحالية: <strong style="color:${badgeColor}; font-size:15px;">${o.shipmentStatusText}</strong>
+                            ${o.commissionStatus === 'paid' ? '<span style="background:#ecfdf5; color:#047857; font-size:11px; padding:2px 6px; border-radius:4px; margin-right:6px; font-weight:800;">تم دفع النسبة ✅</span>' : ''}
+                        </div>
+                        <div style="font-weight:800;">التحصيل: ${o.codAmount.toLocaleString()} ل.س</div>
+                    </div>
+
+                    <div class="card-actions" style="margin-top:12px;">
+                        <button class="btn-delete" onclick="deleteSentOrder('${o._id}', '${o.awb}')">🗑️ إلغاء وحذف الشحنة</button>
+                        <button class="btn-scan" onclick="trackSingleAwb('${o._id}', '${o.awb}')">🔄 تحديث الحالة من بابل</button>
+                        <a href="https://www.babel-express.com/api/v1/documents/awb.php?uid=${o.awb}" target="_blank" class="btn-approve" style="text-decoration:none; display:inline-block;">🖨️ طباعة البوليصة PDF</a>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        } catch (e) {
+            container.innerHTML = '<div style="color:red; text-align:center;">تعذر جلب الشحنات المرسلة.</div>';
+        }
+    }
+
+    async function trackSingleAwb(id, awb) {
+        try {
+            const res = await api('orders/track', { id, awb });
+            if (res.status === 'success') {
+                alert(`✅ تم تحديث الحالة:\n${res.order.shipmentStatusText}`);
+                loadSentOrders();
+            } else {
+                alert("تعذر تحديث الحالة من بابل.");
+            }
+        } catch (e) {
+            alert("خطأ في الاتصال.");
+        }
+    }
+
+    async function deleteSentOrder(id, awb) {
+        if (!confirm(`تحذير هام:\nهل أنت متأكد من إلغاء الشحنة (${awb}) وسحبها من بابل إكسبريس وحذفها نهائياً؟`)) return;
+        try {
+            const res = await api('orders/delete', { id, awb });
+            if (res.status === 'success') {
+                alert("✅ تم إلغاء الشحنة في بابل وحذفها من قاعدة البيانات بنجاح!");
+                loadSentOrders();
+            }
+        } catch (e) {
+            alert("خطأ في حذف الشحنة.");
+        }
+    }
+
+    // ==========================================
+    // 6. حسابات وأرباح المسوقات والتصفير
+    // ==========================================
+    async function loadMarketerReport() {
+        const code = document.getElementById('searchMarketerCode').value.trim();
+        if (!code) return alert("اكتب كود المسوقة أولاً!");
+
+        currentMarketerReportCode = code;
+        const res = await fetch(`/api/marketers/${encodeURIComponent(code)}/stats`);
+        const data = await res.json();
+
+        if (data.status === 'success') {
+            document.getElementById('marketerReportArea').style.display = 'block';
+            document.getElementById('mTotal').innerText = data.stats.totalCount;
+            document.getElementById('mDelivered').innerText = data.stats.deliveredCount;
+            document.getElementById('mReturned').innerText = data.stats.returnedCount;
+            document.getElementById('mInTransit').innerText = data.stats.inTransitCount;
+            document.getElementById('mUnpaidCommission').innerText = `${data.stats.unpaidCommissionSum.toLocaleString()} ل.س`;
+            currentMarketerDueAmount = data.stats.unpaidCommissionSum;
+
+            // عرض الطلبات
+            const list = document.getElementById('marketerOrdersList');
+            list.innerHTML = '';
+            const all = [...data.orders.delivered, ...data.orders.inTransit, ...data.orders.returned, ...data.orders.paid];
+            if (all.length === 0) {
+                list.innerHTML = '<div style="text-align:center; padding:15px; color:var(--gray-600);">لا توجد طلبات مسجلة لهذا الكود.</div>';
+                return;
+            }
+
+            all.forEach(o => {
+                const item = document.createElement('div');
+                item.className = 'info-item';
+                item.style.display = 'flex';
+                item.style.justifyContent = 'space-between';
+                item.style.padding = '12px';
+                item.style.marginBottom = '8px';
+                item.innerHTML = `
+                    <div>
+                        <strong>${o.customerName}</strong> (${o.customerPhone}) - AWB: ${o.awb || 'بدون'}
+                        <div style="font-size:12px; color:var(--gray-600); margin-top:2px;">الحالة: ${o.shipmentStatusText}</div>
+                    </div>
+                    <div style="text-align:left;">
+                        <strong style="color:#047857;">النسبة: ${o.commission.toLocaleString()} ل.س</strong>
+                        <div style="font-size:12px; font-weight:800; color:${o.commissionStatus === 'paid' ? '#10b981' : '#f59e0b'};">
+                            ${o.commissionStatus === 'paid' ? 'تم دفعها ✅' : 'معلقة للدفع ⏳'}
+                        </div>
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+        }
+    }
+
+    function promptSettleCommission() {
+        if (!currentMarketerReportCode) return;
+        if (currentMarketerDueAmount <= 0) {
+            return alert("لا توجد مبالغ مستحقة للدفع لهذه المسوقة حالياً!");
+        }
+
+        document.getElementById('settleModalText').innerHTML = `
+            هل أنت متأكد من أنك دفعت للمسوق/المسوقة صاحب الكود (<strong>${currentMarketerReportCode}</strong>) أمواله البالغة <strong>${currentMarketerDueAmount.toLocaleString()} ل.س</strong>؟
+        `;
+        document.getElementById('settleModal').style.display = 'flex';
+    }
+
+    function closeSettleModal() {
+        document.getElementById('settleModal').style.display = 'none';
+    }
+
+    async function confirmSettleCommission() {
+        try {
+            const res = await api(`marketers/${encodeURIComponent(currentMarketerReportCode)}/settle`, {});
+            if (res.status === 'success') {
+                alert(`✅ تم تصفير مستحقات المسوقة (${currentMarketerReportCode}) وتحديث حالة الطلبات إلى مدفوعة!`);
+                closeSettleModal();
+                loadMarketerReport();
+            } else {
+                alert("تعذر تصفير الحساب.");
+            }
+        } catch (e) {
+            alert("خطأ في الاتصال.");
+        }
+    }
+
+    // تشغيل تحميل المناطق عند فتح الصفحة
+    initTree();
+</script>
+</body>
+</html>
