@@ -6,7 +6,6 @@
     <title>لوحة التاجر - إدارة وتجهيز الشحنات والفواتير</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
-    <!-- مكتبة دمج ملفات الـ PDF السحابية للطباعة المجمعة -->
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 
     <style>
@@ -60,7 +59,6 @@
             color: var(--dark);
         }
 
-        /* شريط التبويبات */
         .tabs-nav {
             display: flex;
             gap: 8px;
@@ -96,7 +94,6 @@
             box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25);
         }
 
-        /* صندوق الإدخال الجماعي */
         .bulk-textarea {
             width: 100%;
             height: 180px;
@@ -131,7 +128,6 @@
 
         .btn-parse:hover { background: var(--primary-hover); }
 
-        /* شبكة البطاقات */
         .cards-grid {
             display: flex;
             flex-direction: column;
@@ -305,7 +301,6 @@
 
         .btn-delete:hover { background: #fca5a5; }
 
-        /* شريط التحكم بالطباعة المجمعة */
         .batch-toolbar {
             background: #f8fafc;
             border: 1.5px solid var(--gray-200);
@@ -319,7 +314,6 @@
             gap: 12px;
         }
 
-        /* نافذة التأكيد */
         .modal-overlay {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -370,7 +364,6 @@
             cursor: pointer;
         }
 
-        /* إحصائيات المسوقات */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -450,7 +443,6 @@
             <button class="btn-pdf" style="background:#475569;" onclick="loadSentOrders()">🔄 تحديث القائمة</button>
         </div>
 
-        <!-- شريط أدوات الطباعة المجمعة -->
         <div class="batch-toolbar">
             <div style="display:flex; align-items:center; gap:8px;">
                 <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAllSent(this.checked)" style="width:18px; height:18px; cursor:pointer;">
@@ -495,7 +487,6 @@
                 </div>
             </div>
 
-            <!-- بطاقة التصفير -->
             <div style="background:#ecfdf5; border:2px solid #10b981; padding:20px; border-radius:12px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
                 <div>
                     <div style="font-size:14px; font-weight:700; color:#065f46;">💰 مجموع النسب المستحقة للدفع (للطلبات المسلمة فقط):</div>
@@ -512,7 +503,6 @@
     </div>
 </div>
 
-<!-- نافذة التأكيد لتصفير الحساب -->
 <div id="settleModal" class="modal-overlay">
     <div class="modal-card">
         <h3 style="margin-top:0; color:var(--dark);">⚠️ تأكيد عملية تصفير ودفع النسب</h3>
@@ -883,8 +873,8 @@
                 if (o.orderStatus === 'returned' || o.shipmentStatusText.includes('مرتجع')) badgeColor = "#ef4444";
 
                 const isPrintedBadge = o.isPrinted
-                    ? `<span style="background:#ecfdf5; color:#047857; font-size:12px; padding:3px 8px; border-radius:6px; font-weight:800; border:1px solid #a7f3d0;">🖨️ تمت الطباعة ✅</span>`
-                    : `<span style="background:#fff7ed; color:#c2410c; font-size:12px; padding:3px 8px; border-radius:6px; font-weight:800; border:1px solid #fed7aa;">⏳ بانتظار الطباعة</span>`;
+                    ? `<span id="badge_${o.awb}" style="background:#ecfdf5; color:#047857; font-size:12px; padding:3px 8px; border-radius:6px; font-weight:800; border:1px solid #a7f3d0;">🖨️ تمت الطباعة ✅</span>`
+                    : `<span id="badge_${o.awb}" style="background:#fff7ed; color:#c2410c; font-size:12px; padding:3px 8px; border-radius:6px; font-weight:800; border:1px solid #fed7aa;">⏳ بانتظار الطباعة</span>`;
 
                 const card = document.createElement('div');
                 card.className = 'order-card';
@@ -930,7 +920,6 @@
         document.querySelectorAll('.sent-order-chk').forEach(chk => chk.checked = isChecked);
     }
 
-    // طباعة الفواتير غير المطبوعة فقط بملف مدمج
     async function printUnprintedOnly() {
         const unprinted = loadedSentOrdersList.filter(o => !o.isPrinted && o.awb);
         if (unprinted.length === 0) {
@@ -940,7 +929,6 @@
         await mergeAndPrintAwbs(awbList, `طباعة ${awbList.length} فاتورة جديدة غير مطبوعة`);
     }
 
-    // طباعة الفواتير المحددة بالمربعات بملف مدمج
     async function printSelectedBatch() {
         const checkedBoxes = document.querySelectorAll('.sent-order-chk:checked');
         if (checkedBoxes.length === 0) {
@@ -950,7 +938,6 @@
         await mergeAndPrintAwbs(awbList, `طباعة ${awbList.length} فاتورة محددة`);
     }
 
-    // المحرك المتقدم لدمج ملفات الـ PDF وتوليد ملف واحد متعدد الصفحات
     async function mergeAndPrintAwbs(awbList, title = "") {
         if (!confirm(`هل تريد ${title} في ملف PDF واحد متتابع؟`)) return;
 
@@ -975,7 +962,7 @@
                     copiedPages.forEach(page => mergedPdf.addPage(page));
                     successCount++;
 
-                    // تحديث حالة الطلب إلى "تمت الطباعة" في قاعدة البيانات
+                    // تحديث الحالة فوراً في الذاكرة والقاعدة
                     await markOrderPrintedInDb(awb);
                 }
             } catch (err) {}
@@ -993,13 +980,12 @@
                 downloadLink.download = `Batch-AWB-${Date.now()}.pdf`;
                 downloadLink.click();
             }
-            loadSentOrders(); // تحديث شارات الطباعة فوراً
+            loadSentOrders();
         } else {
             alert("تعذر استخراج ملفات الـ PDF من بابل إكسبريس.");
         }
     }
 
-    // طباعة بوليصة مفردة مع وضع علامة تمت الطباعة
     async function printSingleAwbPdf(awb, orderIndex) {
         if (!awb) return alert("لا يوجد رقم بوليصة متاح للطباعة!");
 
@@ -1023,7 +1009,7 @@
                 const fileBlob = new Blob([byteArray], { type: 'application/pdf' });
                 const fileURL = URL.createObjectURL(fileBlob);
 
-                // وضع علامة تمت الطباعة في قاعدة البيانات
+                // تحديث الحالة فوراً وتلوين الشارة بالأخضر
                 await markOrderPrintedInDb(awb);
                 loadSentOrders();
 
@@ -1049,6 +1035,13 @@
         if (order) {
             order.isPrinted = true;
             order.printedAt = new Date();
+            
+            // تحديث فوري للشارة على الشاشة
+            const badgeEl = document.getElementById(`badge_${awb}`);
+            if (badgeEl) {
+                badgeEl.outerHTML = `<span id="badge_${awb}" style="background:#ecfdf5; color:#047857; font-size:12px; padding:3px 8px; border-radius:6px; font-weight:800; border:1px solid #a7f3d0;">🖨️ تمت الطباعة ✅</span>`;
+            }
+
             await api('orders/save', order);
         }
     }
