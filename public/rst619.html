@@ -6,7 +6,7 @@
     <title>لوحة التاجر - إدارة وتجهيز الشحنات والفواتير</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
-    <!-- مكتبة دمج ملفات الـ PDF السحابية للطباعة المجمعة -->
+    <!-- مكتبة دمج ملفات الـ PDF للطباعة المجمعة -->
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 
     <style>
@@ -256,6 +256,9 @@
             font-weight: 800;
             cursor: pointer;
             transition: 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
         }
 
         .btn-approve:hover { background: #059669; }
@@ -305,7 +308,6 @@
 
         .btn-delete:hover { background: #fca5a5; }
 
-        /* شريط التحكم بالطباعة المجمعة */
         .batch-toolbar {
             background: #f8fafc;
             border: 1.5px solid var(--gray-200);
@@ -319,7 +321,6 @@
             gap: 12px;
         }
 
-        /* نافذة التأكيد */
         .modal-overlay {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -370,7 +371,6 @@
             cursor: pointer;
         }
 
-        /* إحصائيات المسوقات */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -399,7 +399,7 @@
     <div class="header">
         <div>
             <h1>📦 لوحة إدارة ومعالجة الطلبات وتوليد الفواتير (التاجر)</h1>
-            <div style="font-size:13px; color:var(--gray-600); margin-top:3px;">نظام الفرز المالي، تصدير الشحنات، والطباعة المجمعة لبوالص PDF الرسمية</div>
+            <div style="font-size:13px; color:var(--gray-600); margin-top:3px;">نظام الفرز المالي، تصدير الشحنات الفردي والجماعي، وطباعة بوالص PDF الرسمية</div>
         </div>
         <div id="dbLiveIndicator" style="font-size:12px; font-weight:700; color:var(--success);">🟢 متصل بـ MongoDB</div>
     </div>
@@ -432,11 +432,18 @@
         <button class="btn-parse" onclick="startBulkAnalysis()">⚡ تحليل جميع الطلبات وتوليد بطاقات المراجعة</button>
     </div>
 
-    <!-- 2. بطاقات قيد المراجعة -->
+    <!-- 2. بطاقات قيد المراجعة والتصدير الجماعي -->
     <div id="pendingTab" class="tab-content" style="display:none;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <h3 style="margin:0;">طلبات قيد المراجعة والتدقيق المالي</h3>
-            <button onclick="clearAllPending()" style="background:transparent; border:none; color:var(--danger); font-weight:800; cursor:pointer;">مسح الكل</button>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
+            <h3 style="margin:0;">طلبات قيد المراجعة والتدقيق المالي (<span id="pendingHeadingCount">0</span>)</h3>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                <button class="btn-approve" onclick="exportAllPendingToBabel()" id="btnExportAll">
+                    🚀 تصدير جميع الطلبات دفعة واحدة إلى بابل
+                </button>
+                <button onclick="clearAllPending()" style="background:transparent; border:none; color:var(--danger); font-weight:800; cursor:pointer;">
+                    مسح الكل
+                </button>
+            </div>
         </div>
         <div id="pendingCardsList" class="cards-grid">
             <div style="text-align:center; padding:30px; color:var(--gray-600);">لا توجد طلبات قيد المراجعة حالياً. الصق الطلبات في التبويب الأول.</div>
@@ -494,7 +501,6 @@
                 </div>
             </div>
 
-            <!-- بطاقة التصفير -->
             <div style="background:#ecfdf5; border:2px solid #10b981; padding:20px; border-radius:12px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
                 <div>
                     <div style="font-size:14px; font-weight:700; color:#065f46;">💰 مجموع النسب المستحقة للدفع (للطلبات المسلمة فقط):</div>
@@ -589,9 +595,15 @@
         }
 
         renderPendingCards();
-        document.getElementById('pendingCountBadge').innerText = pendingOrders.length;
+        updatePendingBadges();
         switchTabDirect('pendingTab', 1);
         document.getElementById('bulkInput').value = '';
+    }
+
+    function updatePendingBadges() {
+        document.getElementById('pendingCountBadge').innerText = pendingOrders.length;
+        const headingCount = document.getElementById('pendingHeadingCount');
+        if (headingCount) headingCount.innerText = pendingOrders.length;
     }
 
     function switchTabDirect(tabId, btnIndex) {
@@ -663,7 +675,6 @@
         const normAddr = normalizeAr(order.customerAddress);
         let candidates = [];
 
-        // الكشف عن المحافظات المذكورة في نص العنوان
         const detectedCitiesInText = citiesList.filter(c => normAddr.includes(normalizeAr(c.name)));
 
         for (let item of allNeighbourhoodsList) {
@@ -671,30 +682,25 @@
             const normCity = normalizeAr(item.cityName);
             const normArea = normalizeAr(item.areaName);
 
-            // فحص هل اسم الحي موجود في العنوان
             if (normN.length >= 3 && (normAddr.includes(normN) || normN.includes(normAddr))) {
-                let score = 10; // نقطة أساسية لمطابقة اسم الحي
+                let score = 10;
 
-                // بونص مطابقة المحافظة (مثل: طرطوس)
                 if (normCity && normAddr.includes(normCity)) {
                     score += 100;
                 }
 
-                // بونص مطابقة المنطقة الإدارية (مثل: مدينة طرطوس)
                 if (normArea && normAddr.includes(normArea)) {
                     score += 50;
                 }
 
-                // بونص التطابق الكامل (المحافظة + المنطقة + الحي معاً)
                 if (normCity && normArea && normAddr.includes(normCity) && normAddr.includes(normArea)) {
                     score += 200;
                 }
 
-                // خصم كبير إذا كان العنوان يحدد محافظة معينة بينما هذا الحي يتبع لمحافظة ثانية
                 if (detectedCitiesInText.length > 0) {
                     const isSameCity = detectedCitiesInText.some(c => c.id === item.cityId || normalizeAr(c.name) === normCity);
                     if (!isSameCity) {
-                        score -= 500; // استبعاد أحياء المحافظات الأخرى (مثل محطة حمص عند طلب طرطوس)
+                        score -= 500;
                     }
                 }
 
@@ -702,7 +708,6 @@
             }
         }
 
-        // ترتيب المرشحين واختيار الأعلى نقاطاً
         candidates.sort((a, b) => b.score - a.score);
         let matched = (candidates.length > 0 && candidates[0].score > 0) ? candidates[0].item : null;
 
@@ -754,7 +759,7 @@
     function renderPendingCards() {
         const container = document.getElementById('pendingCardsList');
         if (pendingOrders.length === 0) {
-            container.innerHTML = '<div style="text-align:center; padding:30px; color:var(--gray-600);">لا توجد طلبات قيد المراجعة.</div>';
+            container.innerHTML = '<div style="text-align:center; padding:30px; color:var(--gray-600);">لا توجد طلبات قيد المراجعة حالياً.</div>';
             return;
         }
 
@@ -796,7 +801,7 @@
 
                 <div class="card-actions">
                     <button class="btn-delete" onclick="deletePendingOrder(${index})">🗑️ حذف الطلب</button>
-                    <button class="btn-approve" onclick="approveAndSubmitOrder(${index})">🚀 موافقة وتصدير إلى بابل إكسبريس</button>
+                    <button class="btn-approve" onclick="approveAndSubmitSingleOrder(${index})">🚀 موافقة وتصدير إلى بابل إكسبريس</button>
                 </div>
             `;
             container.appendChild(card);
@@ -805,40 +810,33 @@
 
     function deletePendingOrder(index) {
         pendingOrders.splice(index, 1);
-        document.getElementById('pendingCountBadge').innerText = pendingOrders.length;
+        updatePendingBadges();
         renderPendingCards();
     }
 
     function clearAllPending() {
         if (!confirm("هل أنت متأكد من مسح جميع طلبات المراجعة؟")) return;
         pendingOrders = [];
-        document.getElementById('pendingCountBadge').innerText = 0;
+        updatePendingBadges();
         renderPendingCards();
     }
 
     // ==========================================
-    // 3. الموافقة والتصدير إلى بابل إكسبريس
+    // 3. دالة إرسال شحنة مفردة إلى بابل (Reusable Core)
     // ==========================================
-    async function approveAndSubmitOrder(index) {
-        const o = pendingOrders[index];
+    async function submitSingleOrderPayloadToBabel(o) {
         if (!o.neighbourhoodId) {
-            return alert("لا يمكن التصدير: لم يتم مطابقة حي الزبون بدقة في سيستم بابل!");
+            return { success: false, error: "لم يتم مطابقة حي الزبون بدقة في سيستم بابل!" };
         }
-
-        const btn = event.currentTarget;
-        btn.innerText = "⏳ جاري التصدير وتوليد الفاتورة...";
-        btn.disabled = true;
 
         let phone = o.customerPhone.replace(/\s+/g, '').replace('+963', '').replace(/^0/, '');
 
-        // معرف حي المحطة في طرطوس للمرسل
         const tartusNeighbourhood = allNeighbourhoodsList.find(n =>
             (n.name.includes("المحطة") || normalizeAr(n.name).includes("المحطه")) &&
             (n.cityName.includes("طرطوس") || n.areaName.includes("طرطوس"))
         );
         const senderNeighbourhoodId = tartusNeighbourhood ? tartusNeighbourhood.id : 100;
 
-        // تمرير ملاحظات الزبون في سطر العنوان التفصيلي لتطبع على البوليصة
         const detailedAddress = (o.customerNotes && o.customerNotes.trim().length > 0)
             ? o.customerNotes.trim()
             : (o.customerAddress || "لا توجد ملاحظات إضافية");
@@ -880,23 +878,84 @@
                 o.isPrinted = false;
 
                 await api('orders/save', o);
-
-                alert(`🎉 تم تصدير الشحنة وتوليد البوليصة بنجاح!\nرقم البوليصة (AWB): ${res.awb}`);
-                
-                pendingOrders.splice(index, 1);
-                document.getElementById('pendingCountBadge').innerText = pendingOrders.length;
-                renderPendingCards();
-                
-                switchTabDirect('sentTab', 2);
+                return { success: true, awb: res.awb };
             } else {
-                alert(`❌ فشل التصدير لبابل: ${res.errorMessage || 'تحقق من البيانات'}`);
-                btn.innerText = "🚀 موافقة وتصدير إلى بابل إكسبريس";
-                btn.disabled = false;
+                return { success: false, error: res.errorMessage || "تعذر التصدير لبابل" };
             }
         } catch (e) {
-            alert("❌ خطأ في الاتصال بالخادم.");
-            btn.innerText = "🚀 موافقة وتصدير إلى بابل إكسبريس";
+            return { success: false, error: "خطأ في الاتصال بالخادم" };
+        }
+    }
+
+    // موافقة وتصدير طلب مفرد
+    async function approveAndSubmitSingleOrder(index) {
+        const btn = event.currentTarget;
+        const origText = btn.innerText;
+        btn.innerText = "⏳ جاري التصدير وتوليد الفاتورة...";
+        btn.disabled = true;
+
+        const o = pendingOrders[index];
+        const result = await submitSingleOrderPayloadToBabel(o);
+
+        if (result.success) {
+            alert(`🎉 تم تصدير الشحنة وتوليد البوليصة بنجاح!\nرقم البوليصة (AWB): ${result.awb}`);
+            pendingOrders.splice(index, 1);
+            updatePendingBadges();
+            renderPendingCards();
+            switchTabDirect('sentTab', 2);
+        } else {
+            alert(`❌ فشل التصدير لبابل:\n${result.error}`);
+            btn.innerText = origText;
             btn.disabled = false;
+        }
+    }
+
+    // ==========================================
+    // 🚀 تصدير جميع الطلبات دفعة واحدة إلى بابل
+    // ==========================================
+    async function exportAllPendingToBabel() {
+        if (pendingOrders.length === 0) {
+            return alert("لا توجد طلبات قيد المراجعة لتصديرها!");
+        }
+
+        if (!confirm(`هل أنت متأكد من تصدير جميع الطلبات المتبقية (${pendingOrders.length} طلب) دفعة واحدة إلى بابل إكسبريس؟`)) {
+            return;
+        }
+
+        const exportBtn = document.getElementById('btnExportAll');
+        const origText = exportBtn.innerText;
+        exportBtn.disabled = true;
+
+        let successCount = 0;
+        let failCount = 0;
+        let remainingPending = [];
+
+        for (let i = 0; i < pendingOrders.length; i++) {
+            const o = pendingOrders[i];
+            exportBtn.innerText = `⏳ جاري تصدير (${i + 1} من ${pendingOrders.length})...`;
+
+            const result = await submitSingleOrderPayloadToBabel(o);
+            if (result.success) {
+                successCount++;
+            } else {
+                failCount++;
+                o.hasFeeAlert = true; // تمييز الطلب المتعثر
+                remainingPending.push(o);
+            }
+        }
+
+        exportBtn.innerText = origText;
+        exportBtn.disabled = false;
+
+        pendingOrders = remainingPending;
+        updatePendingBadges();
+        renderPendingCards();
+
+        if (failCount === 0) {
+            alert(`🎉 اكتمل التصدير بنجاح تام!\nتم إنشاء ${successCount} شحنة وتوليد بوالصها في بابل إكسبريس.`);
+            switchTabDirect('sentTab', 2);
+        } else {
+            alert(`✅ تم تصدير ${successCount} طلب بنجاح!\n⚠️ تعذر تصدير ${failCount} طلب بسبب أخطاء في العناوين، بقيت في المراجعة لتعديلها.`);
         }
     }
 
@@ -1041,7 +1100,7 @@
 
         const btn = event.currentTarget;
         const originalText = btn.innerText;
-        btn.innerText = "⏳ جاري جلب الـ PDF...";
+        btn.innerText = "⏳ جاري استخراج ملف الـ PDF...";
         btn.disabled = true;
 
         try {
