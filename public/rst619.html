@@ -6,8 +6,8 @@
     <title>لوحة التاجر المتطورة - إدارة وتجهيز الشحنات</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
-    <!-- مكتبة مسح الباركود بالكاميرا والصور -->
-    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <!-- مكتبة ZXing المتقدمة لقراءة الباركود والـ QR من الصور -->
+    <script src="https://unpkg.com/@zxing/library@latest"></script>
 
     <style>
         :root {
@@ -230,8 +230,8 @@
         .barcode-section {
             background: #f8fafc;
             border: 1px solid #cbd5e1;
-            border-radius: 8px;
-            padding: 10px 14px;
+            border-radius: 10px;
+            padding: 12px 14px;
             margin-bottom: 12px;
             display: flex;
             justify-content: space-between;
@@ -243,26 +243,33 @@
         .barcode-badges {
             display: flex;
             gap: 8px;
+            flex-wrap: wrap;
         }
 
         .b-badge {
             background: #e2e8f0;
-            padding: 4px 10px;
+            padding: 5px 12px;
             border-radius: 6px;
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 800;
         }
 
-        .btn-scan {
-            background: #475569;
+        .btn-scan-trigger {
+            background: #0284c7;
             color: white;
-            border: none;
-            padding: 7px 14px;
-            border-radius: 6px;
+            padding: 9px 16px;
+            border-radius: 8px;
             font-size: 13px;
-            font-weight: 700;
+            font-weight: 800;
             cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border: none;
+            transition: background 0.2s;
         }
+
+        .btn-scan-trigger:hover { background: #0369a1; }
 
         .card-actions {
             display: flex;
@@ -307,7 +314,7 @@
             background: #fff;
         }
 
-        /* نافذة التأكيد المنبثقة (Modal) */
+        /* نافذة التأكيد المنبثقة */
         .modal-overlay {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -379,12 +386,6 @@
             font-weight: 900;
             margin-top: 4px;
         }
-
-        #scannerModalReader {
-            width: 100%;
-            max-width: 400px;
-            margin: auto;
-        }
     </style>
 </head>
 <body>
@@ -393,7 +394,7 @@
     <div class="header">
         <div>
             <h1>📦 لوحة إدارة ومعالجة الطلبات المركزية (التاجر)</h1>
-            <div style="font-size:13px; color:var(--gray-600); margin-top:3px;">نظام الفرز المالي، مسح الباركودات، ومحاسبة المسوقات</div>
+            <div style="font-size:13px; color:var(--gray-600); margin-top:3px;">نظام الفرز المالي، مسح الباركودات/QR، ومحاسبة المسوقات</div>
         </div>
         <div id="dbLiveIndicator" style="font-size:12px; font-weight:700; color:var(--success);">🟢 متصل بـ MongoDB</div>
     </div>
@@ -406,9 +407,7 @@
         <button class="tab-btn" onclick="switchTab('marketersTab')">👩‍💼 حسابات المسوقات</button>
     </div>
 
-    <!-- ==========================================
-         التبويب 1: إدخال وتحليل الطلبات جماعياً
-         ========================================== -->
+    <!-- 1. إدخال وتحليل الطلبات -->
     <div id="parseTab" class="tab-content">
         <label style="font-weight:800; font-size:14px; margin-bottom:6px; display:block;">
             📋 الصق رسائل الواتساب هنا (يقبل حتى 100 طلب دفعة واحدة مفصولة بـ #طلب_توصيل):
@@ -428,9 +427,7 @@
         <button class="btn-parse" onclick="startBulkAnalysis()">⚡ تحليل جميع الطلبات وتوليد بطاقات المراجعة</button>
     </div>
 
-    <!-- ==========================================
-         التبويب 2: بطاقات قيد المراجعة
-         ========================================== -->
+    <!-- 2. بطاقات قيد المراجعة -->
     <div id="pendingTab" class="tab-content" style="display:none;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
             <h3 style="margin:0;">طلبات قيد المراجعة والتدقيق المالي</h3>
@@ -441,20 +438,16 @@
         </div>
     </div>
 
-    <!-- ==========================================
-         التبويب 3: الطلبات المرسلة والتتبع المباشر
-         ========================================== -->
+    <!-- 3. الطلبات المرسلة والتتبع -->
     <div id="sentTab" class="tab-content" style="display:none;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
             <h3 style="margin:0;">سجل الشحنات المصدرة إلى بابل إكسبريس</h3>
-            <button class="btn-scan" onclick="loadSentOrders()">🔄 تحديث القائمة</button>
+            <button class="btn-scan-trigger" onclick="loadSentOrders()">🔄 تحديث القائمة</button>
         </div>
         <div id="sentOrdersList" class="cards-grid"></div>
     </div>
 
-    <!-- ==========================================
-         التبويب 4: حسابات وأرباح المسوقات
-         ========================================== -->
+    <!-- 4. حسابات المسوقات -->
     <div id="marketersTab" class="tab-content" style="display:none;">
         <div style="background:var(--gray-100); padding:15px; border-radius:12px; margin-bottom:20px; border:1px solid var(--gray-200);">
             <label style="font-weight:800; margin-bottom:6px; display:block;">اختر كود المسوقة للاستعلام والمحاسبة:</label>
@@ -484,7 +477,7 @@
                 </div>
             </div>
 
-            <!-- بطاقة المستحقات والتصفير -->
+            <!-- بطاقة التصفير -->
             <div style="background:#ecfdf5; border:2px solid #10b981; padding:20px; border-radius:12px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
                 <div>
                     <div style="font-size:14px; font-weight:700; color:#065f46;">💰 مجموع النسب المستحقة للدفع (للطلبات المسلمة فقط):</div>
@@ -501,7 +494,10 @@
     </div>
 </div>
 
-<!-- النافذة المنبثقة لتأكيد تصفير النسب -->
+<!-- عنصر إدخال ملف الكاميرا والمعرض الخفي -->
+<input type="file" id="universalBarcodeFile" accept="image/*" style="display:none;">
+
+<!-- نافذة التأكيد المنبثقة -->
 <div id="settleModal" class="modal-overlay">
     <div class="modal-card">
         <h3 style="margin-top:0; color:var(--dark);">⚠️ تأكيد عملية تصفير ودفع النسب</h3>
@@ -513,30 +509,13 @@
     </div>
 </div>
 
-<!-- النافذة المنبثقة لماسح الباركود بالكاميرا والصور -->
-<div id="scannerModal" class="modal-overlay">
-    <div class="modal-card" style="max-width:480px;">
-        <h3 style="margin-top:0;">📷 مسح باركود الشحنة (PB-XXXXXX-XXXXX)</h3>
-        <div id="scannerModalReader"></div>
-        <div style="margin-top:15px;">
-            <label style="font-size:13px; font-weight:700;">أو رفع صورة الباركود من الجهاز:</label>
-            <input type="file" id="barcodeFileInput" accept="image/*" style="margin-top:5px; width:100%;">
-        </div>
-        <div class="modal-btns" style="margin-top:15px;">
-            <button class="btn-cancel" onclick="closeScannerModal()">إغلاق الماسح</button>
-        </div>
-    </div>
-</div>
-
 <script>
     let allNeighbourhoodsList = [];
     let pendingOrders = [];
-    let activeScanningCardIndex = null;
-    let html5QrScanner = null;
+    let activeCardIndexForScan = null;
     let currentMarketerReportCode = "";
     let currentMarketerDueAmount = 0;
 
-    // الاتصال بالسيرفر
     async function api(action, data = {}, method = 'POST') {
         const options = {
             method: method,
@@ -547,7 +526,6 @@
         return await res.json();
     }
 
-    // تهيئة الشجرة الجغرافية
     async function initTree() {
         try {
             const res = await fetch('/api/locations-tree');
@@ -567,9 +545,6 @@
         if (tabId === 'sentTab') loadSentOrders();
     }
 
-    // ==========================================
-    // 1. محرك التحليل اللحظي (Bulk Parser)
-    // ==========================================
     function normalizeAr(str) {
         if (!str) return '';
         return str.toString().trim()
@@ -579,13 +554,15 @@
             .replace(/ى/g, 'ي');
     }
 
+    // ==========================================
+    // 1. التحليل الجماعي
+    // ==========================================
     async function startBulkAnalysis() {
         const rawText = document.getElementById('bulkInput').value.trim();
         if (!rawText) return alert("يرجى لصق نص الطلبات أولاً!");
 
-        // تقسيم الطلبات بالاعتماد على وسم #طلب_توصيل أو #
         const rawOrders = rawText.split(/(?=#طلب_توصيل|#طلب)/g).map(t => t.trim()).filter(t => t.length > 10);
-        if (rawOrders.length === 0) return alert("لم يتم العثور على صيغة #طلب_توصيل في النص الملصوق!");
+        if (rawOrders.length === 0) return alert("لم يتم العثور على صيغة #طلب_توصيل في النص!");
 
         alert(`⏳ جاري تحليل ${rawOrders.length} طلب وحساب التكاليف الفعلية ومطابقة الأحياء...`);
 
@@ -667,7 +644,6 @@
     }
 
     async function matchAndCalculateOrder(order) {
-        // 1. مطابقة الحي من العنوان المكتوب
         const normAddr = normalizeAr(order.customerAddress);
         let matched = null;
 
@@ -685,7 +661,6 @@
             order.cityName = matched.cityName;
             order.areaName = matched.areaName;
 
-            // 2. حساب كلفة التوصيل الفعلية عبر API بابل
             try {
                 const res = await api('calculatePrice', {
                     delivery: {
@@ -714,20 +689,16 @@
             order.actualDeliveryFee = order.statedDeliveryFee;
         }
 
-        // 3. التحقق من فرق كلفة التوصيل
         if (order.statedDeliveryFee > 0 && order.actualDeliveryFee > 0 && order.statedDeliveryFee !== order.actualDeliveryFee) {
             order.hasFeeAlert = true;
         }
 
-        // 4. تطبيق المعادلات المالية المعتمدة
-        // مبلغ الدفع عند الاستلام = التكلفة مع توصيل مطروحة من كلفة التوصيل الفعلية
         order.codAmount = Math.max(0, order.totalWithDelivery - order.actualDeliveryFee);
-        // صافي البضاعة للتاجر = التكلفة مع توصيل - النسبة - كلفة التوصيل الفعلية
         order.netMerchantAmount = Math.max(0, order.totalWithDelivery - order.commission - order.actualDeliveryFee);
     }
 
     // ==========================================
-    // 2. بطاقات طلبات قيد المراجعة
+    // 2. بطاقات قيد المراجعة
     // ==========================================
     function renderPendingCards() {
         const container = document.getElementById('pendingCardsList');
@@ -757,7 +728,7 @@
 
                 ${o.hasFeeAlert ? `
                     <div class="alert-banner">
-                        ⚠️ <strong>تنبيه مالي:</strong> المسوقة سجلت التوصيل (${o.statedDeliveryFee.toLocaleString()} ل.س) بينما التوصيل الفعلي لدى بابل هو (${o.actualDeliveryFee.toLocaleString()} ل.س) - تم اعتماد التوصيل الفعلي في المعادلات.
+                        ⚠️ <strong>تنبيه مالي:</strong> المسوقة سجلت التوصيل (${o.statedDeliveryFee.toLocaleString()} ل.س) بينما التوصيل الفعلي لدى بابل هو (${o.actualDeliveryFee.toLocaleString()} ل.س) - تم اعتماد التوصيل الفعلي في الحسابات.
                     </div>
                 ` : ''}
 
@@ -771,21 +742,23 @@
                 <div class="grid-info" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px;">
                     <div class="info-item"><span class="info-label">المبلغ الكلي مع التوصيل:</span><span class="info-val">${o.totalWithDelivery.toLocaleString()} ل.س</span></div>
                     <div class="info-item"><span class="info-label">كلفة التوصيل المعتمدة:</span><span class="info-val" style="color:#0284c7;">${o.actualDeliveryFee.toLocaleString()} ل.س</span></div>
-                    <div class="info-item"><span class="info-label">💵 الدفع عند الاستلام (التحصيل الصافي):</span><span class="info-val" style="color:#047857; font-size:16px;">${o.codAmount.toLocaleString()} ل.س</span></div>
+                    <div class="info-item"><span class="info-label">💵 الدفع عند الاستلام (التحصيل):</span><span class="info-val" style="color:#047857; font-size:16px;">${o.codAmount.toLocaleString()} ل.س</span></div>
                     <div class="info-item"><span class="info-label">نسبة المسوقة:</span><span class="info-val">${o.commission.toLocaleString()} ل.س</span></div>
                     <div class="info-item"><span class="info-label">صافي البضاعة للتاجر:</span><span class="info-val" style="color:#1e293b;">${o.netMerchantAmount.toLocaleString()} ل.س</span></div>
                 </div>
 
-                <!-- مساحة الباركود -->
+                <!-- مساحة الباركود والماسح المطور -->
                 <div class="barcode-section">
                     <div>
                         <div style="font-size:12px; font-weight:800; margin-bottom:4px;">بيانات الباركود الممسوح:</div>
                         <div class="barcode-badges">
-                            <span class="b-badge">الرقم التسلسلي: <strong id="serial_${index}">${o.barcodeSerial || 'لم يمسح'}</strong></span>
-                            <span class="b-badge">الرمز: <strong id="code_${index}">${o.barcodeCode || 'لم يمسح'}</strong></span>
+                            <span class="b-badge">الرقم التسلسلي: <strong id="serial_${index}">${o.barcodeSerial || 'لم يُمسح'}</strong></span>
+                            <span class="b-badge">الرمز: <strong id="code_${index}">${o.barcodeCode || 'لم يُمسح'}</strong></span>
                         </div>
                     </div>
-                    <button class="btn-scan" onclick="openScannerModal(${index})">📷 مسح الباركود (كاميرا / صورة)</button>
+                    <button class="btn-scan-trigger" onclick="triggerUniversalScanner(${index})">
+                        📷 تصوير بالكاميرا أو اختيار صورة
+                    </button>
                 </div>
 
                 <div class="card-actions">
@@ -811,32 +784,99 @@
     }
 
     // ==========================================
-    // 3. ماسح الباركود (PB-XXXXXX-XXXXX)
+    // 3. محرك مسح الباركود والـ QR الخارق (Dual Engine)
     // ==========================================
-    function openScannerModal(index) {
-        activeScanningCardIndex = index;
-        document.getElementById('scannerModal').style.display = 'flex';
+    const universalInput = document.getElementById('universalBarcodeFile');
 
-        html5QrScanner = new Html5Qrcode("scannerModalReader");
-        html5QrScanner.start(
-            { facingMode: "environment" },
-            { fps: 10, qrbox: { width: 250, height: 150 } },
-            onScanSuccess,
-            () => {}
-        ).catch(() => {});
-
-        document.getElementById('barcodeFileInput').onchange = (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            html5QrScanner.scanFile(file, true)
-                .then(decodedText => onScanSuccess(decodedText))
-                .catch(() => alert("تعذر قراءة الباركود من الصورة المرفوعة!"));
-        };
+    function triggerUniversalScanner(index) {
+        activeCardIndexForScan = index;
+        universalInput.value = '';
+        // يفتح للمستخدم خيار الكاميرا الفورية أو اختيار صورة من الملفات
+        universalInput.click();
     }
 
-    function onScanSuccess(decodedText) {
-        // فك تشفير PB-164474-XUUYG
-        const parts = decodedText.split('-');
+    universalInput.addEventListener('change', async function(e) {
+        const file = e.target.files[0];
+        if (!file || activeCardIndexForScan === null) return;
+
+        const originalBtnText = document.querySelectorAll('.btn-scan-trigger')[activeCardIndexForScan]?.innerText;
+        const targetBtn = document.querySelectorAll('.btn-scan-trigger')[activeCardIndexForScan];
+        if (targetBtn) targetBtn.innerText = "⏳ جاري فحص الصورة...";
+
+        try {
+            // تحسين وتصغير حجم الصورة للسرعة الفائقة
+            const imageBitmap = await fileToOptimizedBitmap(file);
+            let decodedString = null;
+
+            // 1. المحاولة الأولى: عبر BarcodeDetector المدمج في المتصفح
+            if ('BarcodeDetector' in window) {
+                try {
+                    const detector = new BarcodeDetector({
+                        formats: ['code_128', 'code_39', 'qr_code', 'data_matrix', 'ean_13', 'upc_a']
+                    });
+                    const barcodes = await detector.detect(imageBitmap);
+                    if (barcodes && barcodes.length > 0) {
+                        decodedString = barcodes[0].rawValue;
+                    }
+                } catch (err) {}
+            }
+
+            // 2. المحاولة الثانية (بديلة): عبر مكتبة ZXing في حال لم يقرأ المحرك الأول
+            if (!decodedString && typeof ZXing !== 'undefined') {
+                try {
+                    const reader = new ZXing.BrowserMultiFormatReader();
+                    const imgUrl = URL.createObjectURL(file);
+                    const result = await reader.decodeFromImageUrl(imgUrl);
+                    if (result) {
+                        decodedString = result.getText();
+                    }
+                    URL.revokeObjectURL(imgUrl);
+                } catch (zxingErr) {}
+            }
+
+            if (targetBtn) targetBtn.innerText = originalBtnText;
+
+            if (decodedString) {
+                applyParsedBarcode(activeCardIndexForScan, decodedString);
+                alert(`✅ تم قراءة الكود بنجاح:\n${decodedString}`);
+            } else {
+                alert("⚠️ لم يتم التعرف على الباركود/QR في هذه الصورة. يرجى التقاط صورة واضحة ومستقيمة للملصق.");
+            }
+        } catch (fatalErr) {
+            if (targetBtn) targetBtn.innerText = originalBtnText;
+            alert("حدث خطأ أثناء قراءة الصورة.");
+        }
+    });
+
+    // دالة مساعدة لتصغير وتحسين الصورة لتجنب تعليق الذاكرة
+    function fileToOptimizedBitmap(file) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => {
+                const maxDim = 1200;
+                let w = img.width;
+                let h = img.height;
+                if (w > maxDim || h > maxDim) {
+                    if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+                    else { w = Math.round((w * maxDim) / h); h = maxDim; }
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, w, h);
+                canvas.toBlob(blob => {
+                    createImageBitmap(blob).then(resolve).catch(reject);
+                }, 'image/jpeg', 0.9);
+            };
+            img.onerror = reject;
+            img.src = URL.createObjectURL(file);
+        });
+    }
+
+    function applyParsedBarcode(index, raw) {
+        // فك تشفير الصيغة: PB-164474-XUUYG
+        const parts = raw.split('-');
         let serial = "";
         let code = "";
 
@@ -847,35 +887,26 @@
             serial = parts[0];
             code = parts[1];
         } else {
-            serial = decodedText;
+            serial = raw;
         }
 
-        if (activeScanningCardIndex !== null) {
-            pendingOrders[activeScanningCardIndex].barcodeRaw = decodedText;
-            pendingOrders[activeScanningCardIndex].barcodeSerial = serial;
-            pendingOrders[activeScanningCardIndex].barcodeCode = code;
-            document.getElementById(`serial_${activeScanningCardIndex}`).innerText = serial;
-            document.getElementById(`code_${activeScanningCardIndex}`).innerText = code;
-        }
+        pendingOrders[index].barcodeRaw = raw;
+        pendingOrders[index].barcodeSerial = serial;
+        pendingOrders[index].barcodeCode = code;
 
-        closeScannerModal();
-    }
-
-    function closeScannerModal() {
-        if (html5QrScanner) {
-            html5QrScanner.stop().then(() => html5QrScanner.clear()).catch(() => {});
-        }
-        document.getElementById('scannerModal').style.display = 'none';
-        activeScanningCardIndex = null;
+        const sEl = document.getElementById(`serial_${index}`);
+        const cEl = document.getElementById(`code_${index}`);
+        if (sEl) sEl.innerText = serial;
+        if (cEl) cEl.innerText = code;
     }
 
     // ==========================================
-    // 4. الموافقة والتصدير إلى بابل إكسبريس (createShipment)
+    // 4. الموافقة والتصدير إلى بابل إكسبريس
     // ==========================================
     async function approveAndSubmitOrder(index) {
         const o = pendingOrders[index];
         if (!o.neighbourhoodId) {
-            return alert("لا يمكن التصدير: لم يتم العثور على معرّف الحي بدقة في سيستم بابل!");
+            return alert("لا يمكن التصدير: لم يتم مطابقة حي الزبون بدقة في سيستم بابل!");
         }
 
         const btn = event.currentTarget;
@@ -896,7 +927,7 @@
                 parts: [{ weight: 1 }],
                 contents: o.niche || "بديل ذهب",
                 deliveryType: "address",
-                pickupType: "hub", // الاستلام من المركز الأقرب للتاجر
+                pickupType: "hub",
                 reference: "",
                 cod: {
                     amount: o.codAmount,
@@ -913,10 +944,9 @@
                 o.orderStatus = "sent";
                 o.shipmentStatusText = "تم تكوين الشحنة";
 
-                // حفظ في MongoDB
                 await api('orders/save', o);
 
-                alert(`🎉 تم تصدير الشحنة بنجاح إلى بابل إكسبريس!\nرقم البوليصة (AWB): ${res.awb}`);
+                alert(`🎉 تم تصدير الشحنة وتوليد البوليصة بنجاح!\nرقم البوليصة (AWB): ${res.awb}`);
                 pendingOrders.splice(index, 1);
                 document.getElementById('pendingCountBadge').innerText = pendingOrders.length;
                 renderPendingCards();
@@ -975,12 +1005,12 @@
                             الحالة الحالية: <strong style="color:${badgeColor}; font-size:15px;">${o.shipmentStatusText}</strong>
                             ${o.commissionStatus === 'paid' ? '<span style="background:#ecfdf5; color:#047857; font-size:11px; padding:2px 6px; border-radius:4px; margin-right:6px; font-weight:800;">تم دفع النسبة ✅</span>' : ''}
                         </div>
-                        <div style="font-weight:800;">التحصيل: ${o.codAmount.toLocaleString()} ل.س</div>
+                        <div style="font-weight:800;">التحصيل الصافي: ${o.codAmount.toLocaleString()} ل.س</div>
                     </div>
 
                     <div class="card-actions" style="margin-top:12px;">
                         <button class="btn-delete" onclick="deleteSentOrder('${o._id}', '${o.awb}')">🗑️ إلغاء وحذف الشحنة</button>
-                        <button class="btn-scan" onclick="trackSingleAwb('${o._id}', '${o.awb}')">🔄 تحديث الحالة من بابل</button>
+                        <button class="btn-scan-trigger" onclick="trackSingleAwb('${o._id}', '${o.awb}')">🔄 تحديث الحالة من بابل</button>
                         <a href="https://www.babel-express.com/api/v1/documents/awb.php?uid=${o.awb}" target="_blank" class="btn-approve" style="text-decoration:none; display:inline-block;">🖨️ طباعة البوليصة PDF</a>
                     </div>
                 `;
@@ -1010,7 +1040,7 @@
         try {
             const res = await api('orders/delete', { id, awb });
             if (res.status === 'success') {
-                alert("✅ تم إلغاء الشحنة في بابل وحذفها من قاعدة البيانات بنجاح!");
+                alert("✅ تم إلغاء الشحنة في بابل وحذفها بنجاح!");
                 loadSentOrders();
             }
         } catch (e) {
@@ -1019,7 +1049,7 @@
     }
 
     // ==========================================
-    // 6. حسابات وأرباح المسوقات والتصفير
+    // 6. حسابات وأرباح المسوقات
     // ==========================================
     async function loadMarketerReport() {
         const code = document.getElementById('searchMarketerCode').value.trim();
@@ -1038,7 +1068,6 @@
             document.getElementById('mUnpaidCommission').innerText = `${data.stats.unpaidCommissionSum.toLocaleString()} ل.س`;
             currentMarketerDueAmount = data.stats.unpaidCommissionSum;
 
-            // عرض الطلبات
             const list = document.getElementById('marketerOrdersList');
             list.innerHTML = '';
             const all = [...data.orders.delivered, ...data.orders.inTransit, ...data.orders.returned, ...data.orders.paid];
@@ -1091,7 +1120,7 @@
         try {
             const res = await api(`marketers/${encodeURIComponent(currentMarketerReportCode)}/settle`, {});
             if (res.status === 'success') {
-                alert(`✅ تم تصفير مستحقات المسوقة (${currentMarketerReportCode}) وتحديث حالة الطلبات إلى مدفوعة!`);
+                alert(`✅ تم تصفير مستحقات المسوقة (${currentMarketerReportCode}) بنجاح!`);
                 closeSettleModal();
                 loadMarketerReport();
             } else {
@@ -1102,7 +1131,6 @@
         }
     }
 
-    // تشغيل تحميل المناطق عند فتح الصفحة
     initTree();
 </script>
 </body>
