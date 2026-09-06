@@ -399,7 +399,7 @@
     <div class="header">
         <div>
             <h1>📦 لوحة إدارة ومعالجة الطلبات وتوليد الفواتير (التاجر)</h1>
-            <div style="font-size:13px; color:var(--gray-600); margin-top:3px;">نظام الفرز المالي، تصدير الشحنات الفردي والجماعي، وطباعة بوالص PDF الرسمية</div>
+            <div style="font-size:13px; color:var(--gray-600); margin-top:3px;">نظام الفرز المالي، تصدير الشحنات الفردي والجماعي، والطباعة المجمعة لبوالص PDF الرسمية</div>
         </div>
         <div id="dbLiveIndicator" style="font-size:12px; font-weight:700; color:var(--success);">🟢 متصل بـ MongoDB</div>
     </div>
@@ -450,11 +450,16 @@
         </div>
     </div>
 
-    <!-- 3. الطلبات المرسلة والطباعة المجمعة -->
+    <!-- 3. الطلبات المرسلة والطباعة المجمعة وحذف الكل -->
     <div id="sentTab" class="tab-content" style="display:none;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
             <h3 style="margin:0;">سجل الشحنات المصدرة إلى بابل إكسبريس (الفواتير)</h3>
-            <button class="btn-pdf" style="background:#475569;" onclick="loadSentOrders()">🔄 تحديث القائمة</button>
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <button class="btn-pdf" style="background:#475569;" onclick="loadSentOrders()">🔄 تحديث القائمة</button>
+                <button onclick="clearAllSentOrders()" style="background:#fee2e2; border:1px solid #fecaca; color:#dc2626; font-weight:800; cursor:pointer; padding:9px 16px; border-radius:8px;">
+                    🗑️ حذف وإلغاء جميع الشحنات
+                </button>
+            </div>
         </div>
 
         <div class="batch-toolbar">
@@ -517,7 +522,6 @@
     </div>
 </div>
 
-<!-- نافذة التأكيد لتصفير الحساب -->
 <div id="settleModal" class="modal-overlay">
     <div class="modal-card">
         <h3 style="margin-top:0; color:var(--dark);">⚠️ تأكيد عملية تصفير ودفع النسب</h3>
@@ -759,7 +763,7 @@
     function renderPendingCards() {
         const container = document.getElementById('pendingCardsList');
         if (pendingOrders.length === 0) {
-            container.innerHTML = '<div style="text-align:center; padding:30px; color:var(--gray-600);">لا توجد طلبات قيد المراجعة حالياً.</div>';
+            container.innerHTML = '<div style="text-align:center; padding:30px; color:var(--gray-600);">لا توجد طلبات قيد المراجعة.</div>';
             return;
         }
 
@@ -939,7 +943,7 @@
                 successCount++;
             } else {
                 failCount++;
-                o.hasFeeAlert = true; // تمييز الطلب المتعثر
+                o.hasFeeAlert = true;
                 remainingPending.push(o);
             }
         }
@@ -960,7 +964,7 @@
     }
 
     // ==========================================
-    // 4. الطلبات المرسلة والطباعة المجمعة والمفردة
+    // 4. الطلبات المرسلة والطباعة المجمعة وحذف الكل
     // ==========================================
     async function loadSentOrders() {
         const container = document.getElementById('sentOrdersList');
@@ -1178,6 +1182,39 @@
         } catch (e) {
             alert("خطأ في حذف الشحنة.");
         }
+    }
+
+    // ==========================================
+    // 🗑️ دالة حذف وإلغاء جميع الشحنات المرسلة
+    // ==========================================
+    async function clearAllSentOrders() {
+        if (loadedSentOrdersList.length === 0) {
+            return alert("لا توجد شحنات مرسلة لحذفها!");
+        }
+
+        const count = loadedSentOrdersList.length;
+        const confirmMsg = `⚠️ تحذير شديد الخطورة:\nهل أنت متأكد تماماً من حذف وإلغاء جميع الشحنات المرسلة (${count} شحنة) دفعة واحدة؟\n\nسيتم سحبها وإلغاؤها نهائياً من حسابك في بابل إكسبريس وحذفها من قاعدة البيانات!`;
+        
+        if (!confirm(confirmMsg)) return;
+        if (!confirm("تأكيد أخير: هل تريد الاستمرار بحذف جميع الشحنات؟ لا يمكن التراجع عن هذا الإجراء.")) return;
+
+        const btn = event?.currentTarget;
+        const origText = btn ? btn.innerText : "";
+        if (btn) btn.innerText = "⏳ جاري الإلغاء والحذف...";
+
+        let deletedCount = 0;
+        for (let o of loadedSentOrdersList) {
+            try {
+                await api('orders/delete', { id: o._id, awb: o.awb });
+                deletedCount++;
+            } catch (e) {
+                console.error("Error deleting sent order", o.awb, e);
+            }
+        }
+
+        if (btn) btn.innerText = origText;
+        alert(`✅ تم إلغاء وحذف ${deletedCount} شحنة بنجاح من بابل إكسبريس وقاعدة البيانات!`);
+        loadSentOrders();
     }
 
     // ==========================================
