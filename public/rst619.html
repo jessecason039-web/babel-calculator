@@ -663,7 +663,7 @@
     }
 
     // ==========================================
-    // 2. بطاقات قيد المراجعة النظيفة
+    // 2. بطاقات قيد المراجعة (مع إظهار ملاحظات الزبون للتسليم)
     // ==========================================
     function renderPendingCards() {
         const container = document.getElementById('pendingCardsList');
@@ -696,8 +696,8 @@
                 <div class="grid-info">
                     <div class="info-item"><span class="info-label">اسم الزبون:</span><span class="info-val">${o.customerName}</span></div>
                     <div class="info-item"><span class="info-label">رقم الزبون:</span><span class="info-val">${o.customerPhone}</span></div>
-                    <div class="info-item"><span class="info-label">العنوان التفصيلي:</span><span class="info-val">${o.customerAddress}</span></div>
-                    <div class="info-item"><span class="info-label">الحي المعتمد لدى بابل:</span><span class="info-val">${o.neighbourhoodName || 'لم يتم العثور بدقة'}</span></div>
+                    <div class="info-item"><span class="info-label">المنطقة والحي المعتمد:</span><span class="info-val">${o.cityName} - ${o.neighbourhoodName || 'لم يطابق بدقة'}</span></div>
+                    <div class="info-item"><span class="info-label">العنوان التفصيلي / ملاحظة التسليم:</span><span class="info-val" style="color:#0369a1;">${o.customerNotes || o.customerAddress || 'لا توجد'}</span></div>
                 </div>
 
                 <div class="grid-info" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px;">
@@ -731,7 +731,7 @@
     }
 
     // ==========================================
-    // 3. الموافقة والتصدير المباشر إلى بابل إكسبريس
+    // 3. الموافقة والتصدير إلى بابل إكسبريس
     // ==========================================
     async function approveAndSubmitOrder(index) {
         const o = pendingOrders[index];
@@ -752,6 +752,11 @@
         );
         const senderNeighbourhoodId = tartusNeighbourhood ? tartusNeighbourhood.id : 100;
 
+        // وضع ملاحظات الزبون في خانة العنوان التفصيلي لتطبع على البوليصة للمندوب
+        const detailedAddress = (o.customerNotes && o.customerNotes.trim().length > 0)
+            ? o.customerNotes.trim()
+            : (o.customerAddress || "لا توجد ملاحظات إضافية");
+
         const payload = {
             shipment: {
                 sender: {
@@ -763,11 +768,11 @@
                 receiver: {
                     name: o.customerName,
                     phone: { country: "963", phone: phone },
-                    address: o.customerAddress,
+                    address: detailedAddress, // تمرير الملاحظة هنا مباشرة
                     neighbourhood: { id: parseInt(o.neighbourhoodId) }
                 },
                 type: "envelope",
-                parts: [{ weight: 1 }], // الوزن فقط لتفادي أي خطأ
+                parts: [{ weight: 1 }],
                 contents: o.niche || "بديل ذهب",
                 deliveryType: "address",
                 pickupType: "hub",
@@ -789,14 +794,12 @@
 
                 await api('orders/save', o);
 
-                // تنبيه فوري وفتح خيار الطباعة
                 alert(`🎉 تم تصدير الشحنة وتوليد البوليصة بنجاح!\nرقم البوليصة (AWB): ${res.awb}`);
                 
                 pendingOrders.splice(index, 1);
                 document.getElementById('pendingCountBadge').innerText = pendingOrders.length;
                 renderPendingCards();
                 
-                // الانتقال للطلبات المرسلة فوراً
                 switchTabDirect('sentTab', 2);
             } else {
                 alert(`❌ فشل التصدير لبابل: ${res.errorMessage || 'تحقق من البيانات'}`);
@@ -846,7 +849,7 @@
                         </div>
                     </div>
 
-                    <div style="font-size:13px; margin-bottom:10px;">📍 ${o.customerAddress}</div>
+                    <div style="font-size:13px; margin-bottom:10px;">📍 ${o.cityName} - ${o.neighbourhoodName} | <strong>ملاحظة:</strong> ${o.customerNotes || o.customerAddress}</div>
                     
                     <div style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc; padding:10px 14px; border-radius:8px; border:1px solid #e2e8f0; flex-wrap:wrap; gap:8px;">
                         <div>
@@ -869,7 +872,6 @@
         }
     }
 
-    // جلب ملف الـ PDF كـ Base64 وتحويله لملف حقيقي
     async function printAwbPdf(awb) {
         if (!awb) return alert("لا يوجد رقم بوليصة متاح للطباعة!");
         
