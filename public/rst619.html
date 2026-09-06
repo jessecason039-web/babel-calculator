@@ -233,6 +233,7 @@
             color: var(--dark);
         }
 
+        /* شريط الباركود التفاعلي */
         .barcode-section {
             background: #f8fafc;
             border: 1px solid #cbd5e1;
@@ -248,16 +249,37 @@
 
         .barcode-badges {
             display: flex;
-            gap: 8px;
+            gap: 10px;
             flex-wrap: wrap;
+            align-items: center;
         }
 
         .b-badge {
             background: #e2e8f0;
-            padding: 5px 12px;
-            border-radius: 6px;
+            padding: 6px 12px;
+            border-radius: 8px;
             font-size: 13px;
             font-weight: 800;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .b-input {
+            width: 95px;
+            border: 1.5px solid #cbd5e1;
+            background: #ffffff;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-weight: 900;
+            font-size: 14px;
+            color: #0f172a;
+            text-align: center;
+            outline: none;
+        }
+
+        .b-input:focus {
+            border-color: var(--primary);
         }
 
         .btn-scan-trigger {
@@ -736,10 +758,16 @@
 
                 <div class="barcode-section">
                     <div>
-                        <div style="font-size:12px; font-weight:800; margin-bottom:4px;">بيانات الباركود الممسوح:</div>
+                        <div style="font-size:12px; font-weight:800; margin-bottom:6px;">بيانات الباركود (مسح بالكاميرا أو تعديل يدوي):</div>
                         <div class="barcode-badges">
-                            <span class="b-badge">الرقم التسلسلي: <strong id="serial_${index}">${o.barcodeSerial || 'لم يُمسح'}</strong></span>
-                            <span class="b-badge">الرمز: <strong id="code_${index}">${o.barcodeCode || 'لم يُمسح'}</strong></span>
+                            <span class="b-badge">السيريال: 
+                                <input type="text" id="serial_${index}" value="${o.barcodeSerial || ''}" placeholder="P164476" 
+                                    oninput="pendingOrders[${index}].barcodeSerial = this.value" class="b-input">
+                            </span>
+                            <span class="b-badge">الرمز: 
+                                <input type="text" id="code_${index}" value="${o.barcodeCode || ''}" placeholder="YUEAV" 
+                                    oninput="pendingOrders[${index}].barcodeCode = this.value" class="b-input" style="width:80px; text-transform:uppercase;">
+                            </span>
                         </div>
                     </div>
                     <button class="btn-scan-trigger" onclick="triggerUniversalScanner(${index})">
@@ -770,7 +798,7 @@
     }
 
     // ==========================================
-    // 3. مسح الباركود والـ QR (Dual Engine)
+    // 3. مسح الباركود والـ QR (مع الحفاظ الدقيق على P)
     // ==========================================
     const universalInput = document.getElementById('universalBarcodeFile');
 
@@ -820,9 +848,9 @@
 
             if (decodedString) {
                 applyParsedBarcode(activeCardIndexForScan, decodedString);
-                alert(`✅ تم قراءة الكود بنجاح:\n${decodedString}`);
+                alert(`✅ تم قراءة الباركود بنجاح:\n${decodedString}`);
             } else {
-                alert("⚠️ لم يتم التعرف على الباركود/QR في هذه الصورة. يرجى التقاط صورة واضحة ومستقيمة للملصق.");
+                alert("⚠️ لم يتم التعرف على الكود في هذه الصورة. يمكنك كتابة السيريال والرمز يدوياً في الخانات.");
             }
         } catch (fatalErr) {
             if (targetBtn) targetBtn.innerText = originalBtnText;
@@ -855,19 +883,44 @@
         });
     }
 
+    // دالة التفكيك الذكية التي تضمن حرف P دائماً
     function applyParsedBarcode(index, raw) {
-        const parts = raw.split('-');
+        if (!raw) return;
+        raw = raw.trim();
+
         let serial = "";
         let code = "";
 
-        if (parts.length >= 3) {
-            serial = parts[1];
-            code = parts[2];
-        } else if (parts.length === 2) {
-            serial = parts[0];
-            code = parts[1];
+        // 1. البحث عن الرقم التسلسلي الذي يبدأ بحرف P ومعه أرقام
+        const serialMatch = raw.match(/P\d{5,8}/i);
+        if (serialMatch) {
+            serial = serialMatch[0].toUpperCase();
         } else {
-            serial = raw;
+            const numMatch = raw.match(/\b\d{5,8}\b/);
+            if (numMatch) serial = "P" + numMatch[0];
+        }
+
+        // 2. البحث عن الرمز (4 إلى 6 أحرف إنجليزية كبيرة)
+        const textWithoutSerial = raw.replace(/P\d{5,8}/ig, '').replace(/PB-?/ig, '');
+        const codeMatch = textWithoutSerial.match(/[A-Z]{4,6}/i);
+        if (codeMatch) {
+            code = codeMatch[0].toUpperCase();
+        }
+
+        // 3. في حال كان مفصولاً بشرطات عادية
+        if (!serial || !code) {
+            const parts = raw.split(/[-_\s]+/);
+            for (let p of parts) {
+                if (/^P?\d+$/i.test(p)) {
+                    serial = p.toUpperCase().startsWith('P') ? p.toUpperCase() : ('P' + p);
+                } else if (/^[A-Z]+$/i.test(p) && p.toUpperCase() !== 'PB') {
+                    code = p.toUpperCase();
+                }
+            }
+        }
+
+        if (serial && !serial.startsWith('P')) {
+            serial = 'P' + serial;
         }
 
         pendingOrders[index].barcodeRaw = raw;
@@ -876,12 +929,12 @@
 
         const sEl = document.getElementById(`serial_${index}`);
         const cEl = document.getElementById(`code_${index}`);
-        if (sEl) sEl.innerText = serial;
-        if (cEl) cEl.innerText = code;
+        if (sEl) sEl.value = serial;
+        if (cEl) cEl.value = code;
     }
 
     // ==========================================
-    // 4. الموافقة والتصدير إلى بابل إكسبريس (تضمين الباركود والسيريال والرمز في أجزاء الشحنة)
+    // 4. الموافقة والتصدير إلى بابل إكسبريس
     // ==========================================
     async function approveAndSubmitOrder(index) {
         const o = pendingOrders[index];
@@ -902,17 +955,26 @@
         );
         const senderNeighbourhoodId = tartusNeighbourhood ? tartusNeighbourhood.id : 100;
 
-        // تجهيز بيانات جزء الشحنة متضمناً السيريال والرمز والباركود
+        // التحقق وضمان حرف P في السيريال
+        let finalSerial = (o.barcodeSerial || "").trim().toUpperCase();
+        if (finalSerial && !finalSerial.startsWith('P')) {
+            finalSerial = 'P' + finalSerial;
+        }
+        const finalCode = (o.barcodeCode || "").trim().toUpperCase();
+
+        // تجهيز بيانات جزء الشحنة بكامل الصيغ ليتعرف عليها بابل إكسبريس
         const partData = {
             weight: 1
         };
-        if (o.barcodeSerial) partData.serial = o.barcodeSerial;
-        if (o.barcodeCode) partData.code = o.barcodeCode;
-        if (o.barcodeRaw) partData.barcode = o.barcodeRaw;
+        if (finalSerial) partData.serial = finalSerial;
+        if (finalCode) partData.code = finalCode;
+        if (finalSerial && finalCode) {
+            partData.barcode = `${finalSerial}-${finalCode}`;
+            partData.partBarcode = `${finalSerial}-${finalCode}`;
+        }
 
         const payload = {
             shipment: {
-                // بيانات المرسل الثابتة لفرع طرطوس
                 sender: {
                     name: "محمد نزيه مصطفى",
                     phone: {
@@ -924,7 +986,6 @@
                         id: senderNeighbourhoodId
                     }
                 },
-                // بيانات الزبون المستلم
                 receiver: {
                     name: o.customerName,
                     phone: { country: "963", phone: phone },
@@ -932,7 +993,8 @@
                     neighbourhood: { id: parseInt(o.neighbourhoodId) }
                 },
                 type: "envelope",
-                parts: [partData], // تمرير الباركود والسيريال والرمز مع الوزن
+                parts: [partData],
+                ...(finalSerial && finalCode ? { partBarcodes: [`${finalSerial}-${finalCode}`] } : {}),
                 contents: o.niche || "بديل ذهب",
                 deliveryType: "address",
                 pickupType: "hub",
