@@ -233,7 +233,6 @@
             color: var(--dark);
         }
 
-        /* شريط الباركود التفاعلي */
         .barcode-section {
             background: #f8fafc;
             border: 1px solid #cbd5e1;
@@ -278,9 +277,7 @@
             outline: none;
         }
 
-        .b-input:focus {
-            border-color: var(--primary);
-        }
+        .b-input:focus { border-color: var(--primary); }
 
         .btn-scan-trigger {
             background: #0284c7;
@@ -319,6 +316,22 @@
         }
 
         .btn-approve:hover { background: #059669; }
+
+        .btn-pdf {
+            background: #0284c7;
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 800;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-pdf:hover { background: #0369a1; }
 
         .btn-delete {
             background: #fee2e2;
@@ -798,7 +811,7 @@
     }
 
     // ==========================================
-    // 3. مسح الباركود والـ QR (مع الحفاظ الدقيق على P)
+    // 3. مسح الباركود والـ QR
     // ==========================================
     const universalInput = document.getElementById('universalBarcodeFile');
 
@@ -883,7 +896,6 @@
         });
     }
 
-    // دالة التفكيك الذكية التي تضمن حرف P دائماً
     function applyParsedBarcode(index, raw) {
         if (!raw) return;
         raw = raw.trim();
@@ -891,7 +903,6 @@
         let serial = "";
         let code = "";
 
-        // 1. البحث عن الرقم التسلسلي الذي يبدأ بحرف P ومعه أرقام
         const serialMatch = raw.match(/P\d{5,8}/i);
         if (serialMatch) {
             serial = serialMatch[0].toUpperCase();
@@ -900,14 +911,12 @@
             if (numMatch) serial = "P" + numMatch[0];
         }
 
-        // 2. البحث عن الرمز (4 إلى 6 أحرف إنجليزية كبيرة)
         const textWithoutSerial = raw.replace(/P\d{5,8}/ig, '').replace(/PB-?/ig, '');
         const codeMatch = textWithoutSerial.match(/[A-Z]{4,6}/i);
         if (codeMatch) {
             code = codeMatch[0].toUpperCase();
         }
 
-        // 3. في حال كان مفصولاً بشرطات عادية
         if (!serial || !code) {
             const parts = raw.split(/[-_\s]+/);
             for (let p of parts) {
@@ -934,7 +943,7 @@
     }
 
     // ==========================================
-    // 4. الموافقة والتصدير إلى بابل إكسبريس
+    // 4. الموافقة والتصدير إلى بابل إكسبريس (حل Error #16910# الجذري)
     // ==========================================
     async function approveAndSubmitOrder(index) {
         const o = pendingOrders[index];
@@ -955,23 +964,14 @@
         );
         const senderNeighbourhoodId = tartusNeighbourhood ? tartusNeighbourhood.id : 100;
 
-        // التحقق وضمان حرف P في السيريال
         let finalSerial = (o.barcodeSerial || "").trim().toUpperCase();
         if (finalSerial && !finalSerial.startsWith('P')) {
             finalSerial = 'P' + finalSerial;
         }
         const finalCode = (o.barcodeCode || "").trim().toUpperCase();
 
-        // تجهيز بيانات جزء الشحنة بكامل الصيغ ليتعرف عليها بابل إكسبريس
-        const partData = {
-            weight: 1
-        };
-        if (finalSerial) partData.serial = finalSerial;
-        if (finalCode) partData.code = finalCode;
-        if (finalSerial && finalCode) {
-            partData.barcode = `${finalSerial}-${finalCode}`;
-            partData.partBarcode = `${finalSerial}-${finalCode}`;
-        }
+        // وضع كود الملصق في خانة المرجعية لتجنب رفض السيرفر
+        const customReference = (finalSerial && finalCode) ? `${finalSerial}-${finalCode}` : (o.barcodeRaw || "");
 
         const payload = {
             shipment: {
@@ -993,12 +993,12 @@
                     neighbourhood: { id: parseInt(o.neighbourhoodId) }
                 },
                 type: "envelope",
-                parts: [partData],
-                ...(finalSerial && finalCode ? { partBarcodes: [`${finalSerial}-${finalCode}`] } : {}),
+                // أجزاء الشحنة تلتزم بالوزن فقط كما يفرضه سيرفر بابل لتفادي الخطأ #16910#
+                parts: [{ weight: 1 }],
                 contents: o.niche || "بديل ذهب",
                 deliveryType: "address",
                 pickupType: "hub",
-                reference: "",
+                reference: customReference, // كود ملصقك الفعلي يظهر هنا في حسابك بـ بابل
                 cod: {
                     amount: o.codAmount,
                     currency: "SYP"
@@ -1033,7 +1033,7 @@
     }
 
     // ==========================================
-    // 5. الطلبات المرسلة والتتبع المباشر
+    // 5. الطلبات المرسلة والتتبع مع ميزة /getAWBPdf المباشرة
     // ==========================================
     async function loadSentOrders() {
         const container = document.getElementById('sentOrdersList');
@@ -1081,13 +1081,58 @@
                     <div class="card-actions" style="margin-top:12px;">
                         <button class="btn-delete" onclick="deleteSentOrder('${o._id}', '${o.awb}')">🗑️ إلغاء وحذف الشحنة</button>
                         <button class="btn-scan-trigger" onclick="trackSingleAwb('${o._id}', '${o.awb}')">🔄 تحديث الحالة من بابل</button>
-                        <a href="https://www.babel-express.com/api/v1/documents/awb.php?uid=${o.awb}" target="_blank" class="btn-approve" style="text-decoration:none; display:inline-block;">🖨️ طباعة البوليصة PDF</a>
+                        <button class="btn-pdf" onclick="printAwbPdf('${o.awb}')">🖨️ طباعة إيصال الشحنة PDF</button>
                     </div>
                 `;
                 container.appendChild(card);
             });
         } catch (e) {
             container.innerHTML = '<div style="color:red; text-align:center;">تعذر جلب الشحنات المرسلة.</div>';
+        }
+    }
+
+    // دالة استدعاء /getAWBPdf وفتح ملف PDF حقيقي فوراً
+    async function printAwbPdf(awb) {
+        if (!awb) return alert("لا يوجد رقم بوليصة متاح للطباعة!");
+        
+        const btn = event.currentTarget;
+        const originalText = btn.innerText;
+        btn.innerText = "⏳ جاري جلب ملف الـ PDF...";
+        btn.disabled = true;
+
+        try {
+            const res = await api('getAWBPdf', { awb: awb });
+            btn.innerText = originalText;
+            btn.disabled = false;
+
+            if (res.status === 'success' && res.base64) {
+                // فك تشفير Base64 وتحويله إلى ملف PDF أصلي
+                const byteCharacters = atob(res.base64);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const fileBlob = new Blob([byteArray], { type: 'application/pdf' });
+                const fileURL = URL.createObjectURL(fileBlob);
+
+                // فتح الـ PDF للطباعة مباشرة في تبويب جديد
+                const printWindow = window.open(fileURL, '_blank');
+                if (!printWindow) {
+                    // في حال منع المتصفح النوافذ المنبثقة، نقوم بتحميل الملف مباشرة
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = fileURL;
+                    downloadLink.download = `AWB-${awb}.pdf`;
+                    downloadLink.click();
+                }
+            } else {
+                // خطة بديلة لفتح رابط البوليصة المباشر إذا تعذر الـ Base64
+                window.open(`https://www.babel-express.com/api/v1/documents/awb.php?uid=${awb}`, '_blank');
+            }
+        } catch (err) {
+            btn.innerText = originalText;
+            btn.disabled = false;
+            window.open(`https://www.babel-express.com/api/v1/documents/awb.php?uid=${awb}`, '_blank');
         }
     }
 
