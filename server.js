@@ -27,8 +27,8 @@ mongoose.connect(MONGO_URI)
 // ==========================================
 const orderSchema = new mongoose.Schema({
     marketerCode: { type: String, default: "" },
-    niche: { type: String, default: "" }, // المجال
-    itemsText: { type: String, default: "" }, // القطع وعددها
+    niche: { type: String, default: "" },
+    itemsText: { type: String, default: "" },
     customerName: { type: String, required: true },
     customerPhone: { type: String, required: true },
     customerAddress: { type: String, default: "" },
@@ -43,7 +43,7 @@ const orderSchema = new mongoose.Schema({
     netMerchantAmount: { type: Number, default: 0 },
     codAmount: { type: Number, default: 0 },
     customerNotes: { type: String, default: "" },
-    originBranch: { type: String, default: "طرطوس - المحطة" }, // مثبت على فرع طرطوس
+    originBranch: { type: String, default: "طرطوس - المحطة" },
     barcodeRaw: { type: String, default: "" },
     barcodeSerial: { type: String, default: "" },
     barcodeCode: { type: String, default: "" },
@@ -52,6 +52,8 @@ const orderSchema = new mongoose.Schema({
     shipmentStatusText: { type: String, default: "قيد المراجعة" },
     commissionStatus: { type: String, default: "unpaid" }, // unpaid, paid
     paidAt: { type: Date, default: null },
+    isPrinted: { type: Boolean, default: false }, // تثبيت حالة الطباعة
+    printedAt: { type: Date, default: null },     // تاريخ ووقت الطباعة
     createdAt: { type: Date, default: Date.now }
 });
 
