@@ -6,7 +6,6 @@
     <title>لوحة التاجر المتطورة - إدارة وتجهيز الشحنات</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
-    <!-- مكتبة ZXing المتقدمة لقراءة الباركود والـ QR من الصور -->
     <script src="https://unpkg.com/@zxing/library@latest"></script>
 
     <style>
@@ -60,7 +59,6 @@
             color: var(--dark);
         }
 
-        /* شريط التبويبات */
         .tabs-nav {
             display: flex;
             gap: 8px;
@@ -96,7 +94,6 @@
             box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25);
         }
 
-        /* صندوق الإدخال الجماعي */
         .bulk-textarea {
             width: 100%;
             height: 180px;
@@ -129,11 +126,8 @@
             transition: 0.2s;
         }
 
-        .btn-parse:hover {
-            background: var(--primary-hover);
-        }
+        .btn-parse:hover { background: var(--primary-hover); }
 
-        /* تصميم البطاقات */
         .cards-grid {
             display: flex;
             flex-direction: column;
@@ -185,6 +179,19 @@
             font-weight: 800;
         }
 
+        .sender-tag {
+            background: #f0fdf4;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 800;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
         .alert-banner {
             background: #fffbeb;
             border: 1.5px solid #fde68a;
@@ -226,7 +233,6 @@
             color: var(--dark);
         }
 
-        /* الباركود والماسح */
         .barcode-section {
             background: #f8fafc;
             border: 1px solid #cbd5e1;
@@ -305,16 +311,6 @@
 
         .btn-delete:hover { background: #fca5a5; }
 
-        .select-origin {
-            padding: 8px 12px;
-            border-radius: 8px;
-            border: 1.5px solid #cbd5e1;
-            font-size: 13px;
-            font-weight: 700;
-            background: #fff;
-        }
-
-        /* نافذة التأكيد المنبثقة */
         .modal-overlay {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -365,7 +361,6 @@
             cursor: pointer;
         }
 
-        /* إحصائيات المسوقات */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -399,7 +394,6 @@
         <div id="dbLiveIndicator" style="font-size:12px; font-weight:700; color:var(--success);">🟢 متصل بـ MongoDB</div>
     </div>
 
-    <!-- التبويبات العلوية -->
     <div class="tabs-nav">
         <button class="tab-btn active" onclick="switchTab('parseTab')">📥 تحليل ولصق الطلبات</button>
         <button class="tab-btn" onclick="switchTab('pendingTab')">📋 قيد المراجعة (<span id="pendingCountBadge">0</span>)</button>
@@ -477,7 +471,6 @@
                 </div>
             </div>
 
-            <!-- بطاقة التصفير -->
             <div style="background:#ecfdf5; border:2px solid #10b981; padding:20px; border-radius:12px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
                 <div>
                     <div style="font-size:14px; font-weight:700; color:#065f46;">💰 مجموع النسب المستحقة للدفع (للطلبات المسلمة فقط):</div>
@@ -494,10 +487,8 @@
     </div>
 </div>
 
-<!-- عنصر إدخال ملف الكاميرا والمعرض الخفي -->
 <input type="file" id="universalBarcodeFile" accept="image/*" style="display:none;">
 
-<!-- نافذة التأكيد المنبثقة -->
 <div id="settleModal" class="modal-overlay">
     <div class="modal-card">
         <h3 style="margin-top:0; color:var(--dark);">⚠️ تأكيد عملية تصفير ودفع النسب</h3>
@@ -601,7 +592,7 @@
             netMerchantAmount: 0,
             codAmount: 0,
             customerNotes: "",
-            originBranch: "دمشق",
+            originBranch: "طرطوس - المحطة",
             barcodeRaw: "",
             barcodeSerial: "",
             barcodeCode: "",
@@ -718,11 +709,7 @@
                         <span class="niche-tag">🏷️ ${o.niche || 'بديل ذهب'}</span>
                     </div>
                     <div>
-                        <label style="font-size:12px; font-weight:800; margin-left:6px;">مركز الإرسال:</label>
-                        <select class="select-origin" onchange="pendingOrders[${index}].originBranch = this.value">
-                            <option value="دمشق" ${o.originBranch === 'دمشق' ? 'selected' : ''}>🏢 مستودع دمشق</option>
-                            <option value="طرطوس" ${o.originBranch === 'طرطوس' ? 'selected' : ''}>🏢 مستودع طرطوس</option>
-                        </select>
+                        <span class="sender-tag">🏢 مركز الإرسال: فرع طرطوس (حي المحطة)</span>
                     </div>
                 </div>
 
@@ -747,7 +734,6 @@
                     <div class="info-item"><span class="info-label">صافي البضاعة للتاجر:</span><span class="info-val" style="color:#1e293b;">${o.netMerchantAmount.toLocaleString()} ل.س</span></div>
                 </div>
 
-                <!-- مساحة الباركود والماسح المطور -->
                 <div class="barcode-section">
                     <div>
                         <div style="font-size:12px; font-weight:800; margin-bottom:4px;">بيانات الباركود الممسوح:</div>
@@ -784,14 +770,13 @@
     }
 
     // ==========================================
-    // 3. محرك مسح الباركود والـ QR الخارق (Dual Engine)
+    // 3. مسح الباركود والـ QR (Dual Engine)
     // ==========================================
     const universalInput = document.getElementById('universalBarcodeFile');
 
     function triggerUniversalScanner(index) {
         activeCardIndexForScan = index;
         universalInput.value = '';
-        // يفتح للمستخدم خيار الكاميرا الفورية أو اختيار صورة من الملفات
         universalInput.click();
     }
 
@@ -804,11 +789,9 @@
         if (targetBtn) targetBtn.innerText = "⏳ جاري فحص الصورة...";
 
         try {
-            // تحسين وتصغير حجم الصورة للسرعة الفائقة
             const imageBitmap = await fileToOptimizedBitmap(file);
             let decodedString = null;
 
-            // 1. المحاولة الأولى: عبر BarcodeDetector المدمج في المتصفح
             if ('BarcodeDetector' in window) {
                 try {
                     const detector = new BarcodeDetector({
@@ -821,7 +804,6 @@
                 } catch (err) {}
             }
 
-            // 2. المحاولة الثانية (بديلة): عبر مكتبة ZXing في حال لم يقرأ المحرك الأول
             if (!decodedString && typeof ZXing !== 'undefined') {
                 try {
                     const reader = new ZXing.BrowserMultiFormatReader();
@@ -848,7 +830,6 @@
         }
     });
 
-    // دالة مساعدة لتصغير وتحسين الصورة لتجنب تعليق الذاكرة
     function fileToOptimizedBitmap(file) {
         return new Promise((resolve, reject) => {
             const img = new Image();
@@ -875,7 +856,6 @@
     }
 
     function applyParsedBarcode(index, raw) {
-        // فك تشفير الصيغة: PB-164474-XUUYG
         const parts = raw.split('-');
         let serial = "";
         let code = "";
@@ -901,7 +881,7 @@
     }
 
     // ==========================================
-    // 4. الموافقة والتصدير إلى بابل إكسبريس
+    // 4. الموافقة والتصدير إلى بابل إكسبريس (مع فرع طرطوس الثابت)
     // ==========================================
     async function approveAndSubmitOrder(index) {
         const o = pendingOrders[index];
@@ -915,8 +895,28 @@
 
         let phone = o.customerPhone.replace(/\s+/g, '').replace('+963', '').replace(/^0/, '');
 
+        // جلب معرف حي "المحطة" في طرطوس
+        const tartusNeighbourhood = allNeighbourhoodsList.find(n =>
+            (n.name.includes("المحطة") || normalizeAr(n.name).includes("المحطه")) &&
+            (n.cityName.includes("طرطوس") || n.areaName.includes("طرطوس"))
+        );
+        const senderNeighbourhoodId = tartusNeighbourhood ? tartusNeighbourhood.id : 100;
+
         const payload = {
             shipment: {
+                // بيانات المرسل الثابتة لفرع طرطوس
+                sender: {
+                    name: "محمد نزيه مصطفى",
+                    phone: {
+                        country: "963",
+                        phone: "985621414"
+                    },
+                    address: "مقابل زهرة للتموين العائلي - الشارع المقابل لنادي الشرق الرياضي",
+                    neighbourhood: {
+                        id: senderNeighbourhoodId
+                    }
+                },
+                // بيانات الزبون المستلم
                 receiver: {
                     name: o.customerName,
                     phone: { country: "963", phone: phone },
@@ -927,13 +927,13 @@
                 parts: [{ weight: 1 }],
                 contents: o.niche || "بديل ذهب",
                 deliveryType: "address",
-                pickupType: "hub",
+                pickupType: "hub", // استلام من المركز الأقرب للتاجر
                 reference: "",
                 cod: {
                     amount: o.codAmount,
                     currency: "SYP"
                 },
-                payer: "receiver"
+                payer: "receiver" // المستلم يدفع
             }
         };
 
