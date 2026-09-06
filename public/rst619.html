@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لوحة التاجر المتطورة - إدارة وتجهيز الشحنات</title>
+    <title>لوحة التاجر - إدارة وتجهيز الشحنات والفواتير</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/@zxing/library@latest"></script>
 
     <style>
         :root {
@@ -59,6 +58,7 @@
             color: var(--dark);
         }
 
+        /* شريط التبويبات */
         .tabs-nav {
             display: flex;
             gap: 8px;
@@ -94,6 +94,7 @@
             box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25);
         }
 
+        /* صندوق الإدخال الجماعي */
         .bulk-textarea {
             width: 100%;
             height: 180px;
@@ -128,6 +129,7 @@
 
         .btn-parse:hover { background: var(--primary-hover); }
 
+        /* شبكة البطاقات */
         .cards-grid {
             display: flex;
             flex-direction: column;
@@ -233,74 +235,11 @@
             color: var(--dark);
         }
 
-        .barcode-section {
-            background: #f8fafc;
-            border: 1px solid #cbd5e1;
-            border-radius: 10px;
-            padding: 12px 14px;
-            margin-bottom: 12px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-
-        .barcode-badges {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            align-items: center;
-        }
-
-        .b-badge {
-            background: #e2e8f0;
-            padding: 6px 12px;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 800;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .b-input {
-            width: 95px;
-            border: 1.5px solid #cbd5e1;
-            background: #ffffff;
-            padding: 4px 8px;
-            border-radius: 6px;
-            font-weight: 900;
-            font-size: 14px;
-            color: #0f172a;
-            text-align: center;
-            outline: none;
-        }
-
-        .b-input:focus { border-color: var(--primary); }
-
-        .btn-scan-trigger {
-            background: #0284c7;
-            color: white;
-            padding: 9px 16px;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 800;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            border: none;
-            transition: background 0.2s;
-        }
-
-        .btn-scan-trigger:hover { background: #0369a1; }
-
         .card-actions {
             display: flex;
             gap: 10px;
             justify-content: flex-end;
-            margin-top: 10px;
+            margin-top: 14px;
             flex-wrap: wrap;
         }
 
@@ -308,11 +247,12 @@
             background: var(--success);
             color: white;
             border: none;
-            padding: 10px 20px;
+            padding: 11px 22px;
             border-radius: 8px;
             font-size: 15px;
             font-weight: 800;
             cursor: pointer;
+            transition: 0.2s;
         }
 
         .btn-approve:hover { background: #059669; }
@@ -346,6 +286,7 @@
 
         .btn-delete:hover { background: #fca5a5; }
 
+        /* نافذة التأكيد */
         .modal-overlay {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -396,6 +337,7 @@
             cursor: pointer;
         }
 
+        /* إحصائيات المسوقات */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -423,16 +365,17 @@
 <div class="container">
     <div class="header">
         <div>
-            <h1>📦 لوحة إدارة ومعالجة الطلبات المركزية (التاجر)</h1>
-            <div style="font-size:13px; color:var(--gray-600); margin-top:3px;">نظام الفرز المالي، مسح الباركودات/QR، ومحاسبة المسوقات</div>
+            <h1>📦 لوحة إدارة ومعالجة الطلبات وتوليد الفواتير (التاجر)</h1>
+            <div style="font-size:13px; color:var(--gray-600); margin-top:3px;">نظام الفرز المالي الفوري، تصدير الشحنات، وطباعة بوالص PDF الرسمية</div>
         </div>
         <div id="dbLiveIndicator" style="font-size:12px; font-weight:700; color:var(--success);">🟢 متصل بـ MongoDB</div>
     </div>
 
+    <!-- شريط التبويبات -->
     <div class="tabs-nav">
         <button class="tab-btn active" onclick="switchTab('parseTab')">📥 تحليل ولصق الطلبات</button>
         <button class="tab-btn" onclick="switchTab('pendingTab')">📋 قيد المراجعة (<span id="pendingCountBadge">0</span>)</button>
-        <button class="tab-btn" onclick="switchTab('sentTab')">🚚 الطلبات المرسلة والتتبع</button>
+        <button class="tab-btn" onclick="switchTab('sentTab')">🚚 الطلبات المرسلة والفواتير</button>
         <button class="tab-btn" onclick="switchTab('marketersTab')">👩‍💼 حسابات المسوقات</button>
     </div>
 
@@ -467,11 +410,11 @@
         </div>
     </div>
 
-    <!-- 3. الطلبات المرسلة والتتبع -->
+    <!-- 3. الطلبات المرسلة والتتبع وطباعة الفواتير -->
     <div id="sentTab" class="tab-content" style="display:none;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <h3 style="margin:0;">سجل الشحنات المصدرة إلى بابل إكسبريس</h3>
-            <button class="btn-scan-trigger" onclick="loadSentOrders()">🔄 تحديث القائمة</button>
+            <h3 style="margin:0;">سجل الشحنات المصدرة إلى بابل إكسبريس (الفواتير)</h3>
+            <button class="btn-pdf" onclick="loadSentOrders()">🔄 تحديث القائمة</button>
         </div>
         <div id="sentOrdersList" class="cards-grid"></div>
     </div>
@@ -506,6 +449,7 @@
                 </div>
             </div>
 
+            <!-- بطاقة التصفير -->
             <div style="background:#ecfdf5; border:2px solid #10b981; padding:20px; border-radius:12px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
                 <div>
                     <div style="font-size:14px; font-weight:700; color:#065f46;">💰 مجموع النسب المستحقة للدفع (للطلبات المسلمة فقط):</div>
@@ -522,8 +466,7 @@
     </div>
 </div>
 
-<input type="file" id="universalBarcodeFile" accept="image/*" style="display:none;">
-
+<!-- نافذة التأكيد لتصفير الحساب -->
 <div id="settleModal" class="modal-overlay">
     <div class="modal-card">
         <h3 style="margin-top:0; color:var(--dark);">⚠️ تأكيد عملية تصفير ودفع النسب</h3>
@@ -538,7 +481,6 @@
 <script>
     let allNeighbourhoodsList = [];
     let pendingOrders = [];
-    let activeCardIndexForScan = null;
     let currentMarketerReportCode = "";
     let currentMarketerDueAmount = 0;
 
@@ -581,7 +523,7 @@
     }
 
     // ==========================================
-    // 1. التحليل الجماعي
+    // 1. التحليل الجماعي الفوري
     // ==========================================
     async function startBulkAnalysis() {
         const rawText = document.getElementById('bulkInput').value.trim();
@@ -628,9 +570,6 @@
             codAmount: 0,
             customerNotes: "",
             originBranch: "طرطوس - المحطة",
-            barcodeRaw: "",
-            barcodeSerial: "",
-            barcodeCode: "",
             neighbourhoodId: null,
             cityName: "",
             areaName: "",
@@ -724,7 +663,7 @@
     }
 
     // ==========================================
-    // 2. بطاقات قيد المراجعة
+    // 2. بطاقات قيد المراجعة النظيفة
     // ==========================================
     function renderPendingCards() {
         const container = document.getElementById('pendingCardsList');
@@ -758,7 +697,7 @@
                     <div class="info-item"><span class="info-label">اسم الزبون:</span><span class="info-val">${o.customerName}</span></div>
                     <div class="info-item"><span class="info-label">رقم الزبون:</span><span class="info-val">${o.customerPhone}</span></div>
                     <div class="info-item"><span class="info-label">العنوان التفصيلي:</span><span class="info-val">${o.customerAddress}</span></div>
-                    <div class="info-item"><span class="info-label">الحي المعترف به بابل:</span><span class="info-val">${o.neighbourhoodName || 'لم يتم العثور بدقة'}</span></div>
+                    <div class="info-item"><span class="info-label">الحي المعتمد لدى بابل:</span><span class="info-val">${o.neighbourhoodName || 'لم يتم العثور بدقة'}</span></div>
                 </div>
 
                 <div class="grid-info" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px;">
@@ -767,25 +706,6 @@
                     <div class="info-item"><span class="info-label">💵 الدفع عند الاستلام (التحصيل):</span><span class="info-val" style="color:#047857; font-size:16px;">${o.codAmount.toLocaleString()} ل.س</span></div>
                     <div class="info-item"><span class="info-label">نسبة المسوقة:</span><span class="info-val">${o.commission.toLocaleString()} ل.س</span></div>
                     <div class="info-item"><span class="info-label">صافي البضاعة للتاجر:</span><span class="info-val" style="color:#1e293b;">${o.netMerchantAmount.toLocaleString()} ل.س</span></div>
-                </div>
-
-                <div class="barcode-section">
-                    <div>
-                        <div style="font-size:12px; font-weight:800; margin-bottom:6px;">بيانات الباركود (مسح بالكاميرا أو تعديل يدوي):</div>
-                        <div class="barcode-badges">
-                            <span class="b-badge">السيريال: 
-                                <input type="text" id="serial_${index}" value="${o.barcodeSerial || ''}" placeholder="P164476" 
-                                    oninput="pendingOrders[${index}].barcodeSerial = this.value" class="b-input">
-                            </span>
-                            <span class="b-badge">الرمز: 
-                                <input type="text" id="code_${index}" value="${o.barcodeCode || ''}" placeholder="YUEAV" 
-                                    oninput="pendingOrders[${index}].barcodeCode = this.value" class="b-input" style="width:80px; text-transform:uppercase;">
-                            </span>
-                        </div>
-                    </div>
-                    <button class="btn-scan-trigger" onclick="triggerUniversalScanner(${index})">
-                        📷 تصوير بالكاميرا أو اختيار صورة
-                    </button>
                 </div>
 
                 <div class="card-actions">
@@ -811,139 +731,7 @@
     }
 
     // ==========================================
-    // 3. مسح الباركود والـ QR
-    // ==========================================
-    const universalInput = document.getElementById('universalBarcodeFile');
-
-    function triggerUniversalScanner(index) {
-        activeCardIndexForScan = index;
-        universalInput.value = '';
-        universalInput.click();
-    }
-
-    universalInput.addEventListener('change', async function(e) {
-        const file = e.target.files[0];
-        if (!file || activeCardIndexForScan === null) return;
-
-        const originalBtnText = document.querySelectorAll('.btn-scan-trigger')[activeCardIndexForScan]?.innerText;
-        const targetBtn = document.querySelectorAll('.btn-scan-trigger')[activeCardIndexForScan];
-        if (targetBtn) targetBtn.innerText = "⏳ جاري فحص الصورة...";
-
-        try {
-            const imageBitmap = await fileToOptimizedBitmap(file);
-            let decodedString = null;
-
-            if ('BarcodeDetector' in window) {
-                try {
-                    const detector = new BarcodeDetector({
-                        formats: ['code_128', 'code_39', 'qr_code', 'data_matrix', 'ean_13', 'upc_a']
-                    });
-                    const barcodes = await detector.detect(imageBitmap);
-                    if (barcodes && barcodes.length > 0) {
-                        decodedString = barcodes[0].rawValue;
-                    }
-                } catch (err) {}
-            }
-
-            if (!decodedString && typeof ZXing !== 'undefined') {
-                try {
-                    const reader = new ZXing.BrowserMultiFormatReader();
-                    const imgUrl = URL.createObjectURL(file);
-                    const result = await reader.decodeFromImageUrl(imgUrl);
-                    if (result) {
-                        decodedString = result.getText();
-                    }
-                    URL.revokeObjectURL(imgUrl);
-                } catch (zxingErr) {}
-            }
-
-            if (targetBtn) targetBtn.innerText = originalBtnText;
-
-            if (decodedString) {
-                applyParsedBarcode(activeCardIndexForScan, decodedString);
-                alert(`✅ تم قراءة الباركود بنجاح:\n${decodedString}`);
-            } else {
-                alert("⚠️ لم يتم التعرف على الكود في هذه الصورة. يمكنك كتابة السيريال والرمز يدوياً في الخانات.");
-            }
-        } catch (fatalErr) {
-            if (targetBtn) targetBtn.innerText = originalBtnText;
-            alert("حدث خطأ أثناء قراءة الصورة.");
-        }
-    });
-
-    function fileToOptimizedBitmap(file) {
-        return new Promise((resolve, reject) => {
-            const img = new Image();
-            img.onload = () => {
-                const maxDim = 1200;
-                let w = img.width;
-                let h = img.height;
-                if (w > maxDim || h > maxDim) {
-                    if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
-                    else { w = Math.round((w * maxDim) / h); h = maxDim; }
-                }
-                const canvas = document.createElement('canvas');
-                canvas.width = w;
-                canvas.height = h;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, w, h);
-                canvas.toBlob(blob => {
-                    createImageBitmap(blob).then(resolve).catch(reject);
-                }, 'image/jpeg', 0.9);
-            };
-            img.onerror = reject;
-            img.src = URL.createObjectURL(file);
-        });
-    }
-
-    function applyParsedBarcode(index, raw) {
-        if (!raw) return;
-        raw = raw.trim();
-
-        let serial = "";
-        let code = "";
-
-        const serialMatch = raw.match(/P\d{5,8}/i);
-        if (serialMatch) {
-            serial = serialMatch[0].toUpperCase();
-        } else {
-            const numMatch = raw.match(/\b\d{5,8}\b/);
-            if (numMatch) serial = "P" + numMatch[0];
-        }
-
-        const textWithoutSerial = raw.replace(/P\d{5,8}/ig, '').replace(/PB-?/ig, '');
-        const codeMatch = textWithoutSerial.match(/[A-Z]{4,6}/i);
-        if (codeMatch) {
-            code = codeMatch[0].toUpperCase();
-        }
-
-        if (!serial || !code) {
-            const parts = raw.split(/[-_\s]+/);
-            for (let p of parts) {
-                if (/^P?\d+$/i.test(p)) {
-                    serial = p.toUpperCase().startsWith('P') ? p.toUpperCase() : ('P' + p);
-                } else if (/^[A-Z]+$/i.test(p) && p.toUpperCase() !== 'PB') {
-                    code = p.toUpperCase();
-                }
-            }
-        }
-
-        if (serial && !serial.startsWith('P')) {
-            serial = 'P' + serial;
-        }
-
-        pendingOrders[index].barcodeRaw = raw;
-        pendingOrders[index].barcodeSerial = serial;
-        pendingOrders[index].barcodeCode = code;
-
-        const sEl = document.getElementById(`serial_${index}`);
-        const cEl = document.getElementById(`code_${index}`);
-        if (sEl) sEl.value = serial;
-        if (cEl) cEl.value = code;
-    }
-
-    // ==========================================
-    // 4. الموافقة والتصدير إلى بابل إكسبريس (حل Error #16910# الجذري)
+    // 3. الموافقة والتصدير المباشر إلى بابل إكسبريس
     // ==========================================
     async function approveAndSubmitOrder(index) {
         const o = pendingOrders[index];
@@ -952,39 +740,25 @@
         }
 
         const btn = event.currentTarget;
-        btn.innerText = "⏳ جاري التصدير إلى بابل...";
+        btn.innerText = "⏳ جاري التصدير وتوليد الفاتورة...";
         btn.disabled = true;
 
         let phone = o.customerPhone.replace(/\s+/g, '').replace('+963', '').replace(/^0/, '');
 
-        // جلب معرف حي "المحطة" في طرطوس للمرسل
+        // معرف حي المحطة في طرطوس للمرسل
         const tartusNeighbourhood = allNeighbourhoodsList.find(n =>
             (n.name.includes("المحطة") || normalizeAr(n.name).includes("المحطه")) &&
             (n.cityName.includes("طرطوس") || n.areaName.includes("طرطوس"))
         );
         const senderNeighbourhoodId = tartusNeighbourhood ? tartusNeighbourhood.id : 100;
 
-        let finalSerial = (o.barcodeSerial || "").trim().toUpperCase();
-        if (finalSerial && !finalSerial.startsWith('P')) {
-            finalSerial = 'P' + finalSerial;
-        }
-        const finalCode = (o.barcodeCode || "").trim().toUpperCase();
-
-        // وضع كود الملصق في خانة المرجعية لتجنب رفض السيرفر
-        const customReference = (finalSerial && finalCode) ? `${finalSerial}-${finalCode}` : (o.barcodeRaw || "");
-
         const payload = {
             shipment: {
                 sender: {
                     name: "محمد نزيه مصطفى",
-                    phone: {
-                        country: "963",
-                        phone: "985621414"
-                    },
+                    phone: { country: "963", phone: "985621414" },
                     address: "مقابل زهرة للتموين العائلي - الشارع المقابل لنادي الشرق الرياضي",
-                    neighbourhood: {
-                        id: senderNeighbourhoodId
-                    }
+                    neighbourhood: { id: senderNeighbourhoodId }
                 },
                 receiver: {
                     name: o.customerName,
@@ -993,12 +767,11 @@
                     neighbourhood: { id: parseInt(o.neighbourhoodId) }
                 },
                 type: "envelope",
-                // أجزاء الشحنة تلتزم بالوزن فقط كما يفرضه سيرفر بابل لتفادي الخطأ #16910#
-                parts: [{ weight: 1 }],
+                parts: [{ weight: 1 }], // الوزن فقط لتفادي أي خطأ
                 contents: o.niche || "بديل ذهب",
                 deliveryType: "address",
                 pickupType: "hub",
-                reference: customReference, // كود ملصقك الفعلي يظهر هنا في حسابك بـ بابل
+                reference: "",
                 cod: {
                     amount: o.codAmount,
                     currency: "SYP"
@@ -1016,10 +789,15 @@
 
                 await api('orders/save', o);
 
+                // تنبيه فوري وفتح خيار الطباعة
                 alert(`🎉 تم تصدير الشحنة وتوليد البوليصة بنجاح!\nرقم البوليصة (AWB): ${res.awb}`);
+                
                 pendingOrders.splice(index, 1);
                 document.getElementById('pendingCountBadge').innerText = pendingOrders.length;
                 renderPendingCards();
+                
+                // الانتقال للطلبات المرسلة فوراً
+                switchTabDirect('sentTab', 2);
             } else {
                 alert(`❌ فشل التصدير لبابل: ${res.errorMessage || 'تحقق من البيانات'}`);
                 btn.innerText = "🚀 موافقة وتصدير إلى بابل إكسبريس";
@@ -1033,7 +811,7 @@
     }
 
     // ==========================================
-    // 5. الطلبات المرسلة والتتبع مع ميزة /getAWBPdf المباشرة
+    // 4. الطلبات المرسلة والتتبع وطباعة الـ PDF المباشرة
     // ==========================================
     async function loadSentOrders() {
         const container = document.getElementById('sentOrdersList');
@@ -1080,8 +858,8 @@
 
                     <div class="card-actions" style="margin-top:12px;">
                         <button class="btn-delete" onclick="deleteSentOrder('${o._id}', '${o.awb}')">🗑️ إلغاء وحذف الشحنة</button>
-                        <button class="btn-scan-trigger" onclick="trackSingleAwb('${o._id}', '${o.awb}')">🔄 تحديث الحالة من بابل</button>
-                        <button class="btn-pdf" onclick="printAwbPdf('${o.awb}')">🖨️ طباعة إيصال الشحنة PDF</button>
+                        <button class="btn-pdf" style="background:#475569;" onclick="trackSingleAwb('${o._id}', '${o.awb}')">🔄 تحديث الحالة من بابل</button>
+                        <button class="btn-pdf" onclick="printAwbPdf('${o.awb}')">🖨️ طباعة الفاتورة / الإيصال PDF</button>
                     </div>
                 `;
                 container.appendChild(card);
@@ -1091,13 +869,13 @@
         }
     }
 
-    // دالة استدعاء /getAWBPdf وفتح ملف PDF حقيقي فوراً
+    // جلب ملف الـ PDF كـ Base64 وتحويله لملف حقيقي
     async function printAwbPdf(awb) {
         if (!awb) return alert("لا يوجد رقم بوليصة متاح للطباعة!");
         
         const btn = event.currentTarget;
         const originalText = btn.innerText;
-        btn.innerText = "⏳ جاري جلب ملف الـ PDF...";
+        btn.innerText = "⏳ جاري استخراج ملف الـ PDF...";
         btn.disabled = true;
 
         try {
@@ -1106,7 +884,6 @@
             btn.disabled = false;
 
             if (res.status === 'success' && res.base64) {
-                // فك تشفير Base64 وتحويله إلى ملف PDF أصلي
                 const byteCharacters = atob(res.base64);
                 const byteNumbers = new Array(byteCharacters.length);
                 for (let i = 0; i < byteCharacters.length; i++) {
@@ -1116,17 +893,14 @@
                 const fileBlob = new Blob([byteArray], { type: 'application/pdf' });
                 const fileURL = URL.createObjectURL(fileBlob);
 
-                // فتح الـ PDF للطباعة مباشرة في تبويب جديد
                 const printWindow = window.open(fileURL, '_blank');
                 if (!printWindow) {
-                    // في حال منع المتصفح النوافذ المنبثقة، نقوم بتحميل الملف مباشرة
                     const downloadLink = document.createElement('a');
                     downloadLink.href = fileURL;
                     downloadLink.download = `AWB-${awb}.pdf`;
                     downloadLink.click();
                 }
             } else {
-                // خطة بديلة لفتح رابط البوليصة المباشر إذا تعذر الـ Base64
                 window.open(`https://www.babel-express.com/api/v1/documents/awb.php?uid=${awb}`, '_blank');
             }
         } catch (err) {
@@ -1164,7 +938,7 @@
     }
 
     // ==========================================
-    // 6. حسابات وأرباح المسوقات
+    // 5. حسابات وأرباح المسوقات والتصفير
     // ==========================================
     async function loadMarketerReport() {
         const code = document.getElementById('searchMarketerCode').value.trim();
