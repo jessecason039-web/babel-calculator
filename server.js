@@ -1,17 +1,36 @@
 const express = require('express');
 const axios = require('axios');
 const path = require('path');
+const mongoose = require('mongoose');
 
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// ⚙️ رابط قاعدة بيانات MongoDB Atlas الخاصة بك
+const MONGO_URI = "mongodb+srv://jessecason039_db_user:0nWuR26w5Y8NHpBH@cluster0.l7h705q.mongodb.net/babel_orders?retryWrites=true&w=majority";
+
+// 🔌 الاتصال بقاعدة البيانات
+mongoose.connect(MONGO_URI)
+  .then(() => console.log("✅ تم الاتصال بقاعدة بيانات MongoDB بنجاح!"))
+  .catch(err => console.error("❌ خطأ في الاتصال بقاعدة البيانات:", err.message));
+
+// بيانات بابل إكسبريس
 const BABEL_USER = "Mohamed_Mostafa";
 const BABEL_PASS = "Babel949945";
 const BABEL_API_URL = "https://www.babel-express.com/api/v1/webservice.php";
 
 const authHeader = 'Basic ' + Buffer.from(`${BABEL_USER}:${BABEL_PASS}`).toString('base64');
 const headers = { 'Content-Type': 'application/json', 'Authorization': authHeader };
+
+// مسار فحص حالة الاتصال بقاعدة البيانات
+app.get('/api/db-status', (req, res) => {
+    const isConnected = mongoose.connection.readyState === 1;
+    res.json({
+        database: isConnected ? "متصلة بنجاح ✅" : "غير متصلة ❌",
+        status: isConnected ? "connected" : "disconnected"
+    });
+});
 
 // الذاكرة المؤقتة للشجرة الجغرافية
 let cachedGeographicTree = null;
@@ -32,7 +51,7 @@ async function runInParallelBatches(items, asyncFn, batchSize = 12) {
     return results;
 }
 
-// بناء الشجرة بسرعة فائقة (Parallel Execution)
+// بناء الشجرة بسرعة فائقة
 async function buildFullTree() {
     if (cachedGeographicTree) return cachedGeographicTree;
     if (isTreeBuilding) return null;
@@ -63,7 +82,7 @@ async function buildFullTree() {
             } catch (e) {}
         }));
 
-        // 3. جلب أحياء كل المناطق في دفعات متوازية سريعة
+        // 3. جلب أحياء كل المناطق في دفعات متوازية
         let allNeighbourhoods = [];
         await runInParallelBatches(allAreasFlat, async (areaObj) => {
             try {
@@ -84,7 +103,7 @@ async function buildFullTree() {
         }, 15);
 
         cachedGeographicTree = { cities, neighbourhoods: allNeighbourhoods };
-        console.log(`✅ اكتملت المزامنة بنجاح فائقة: تم تخزين ${allNeighbourhoods.length} حي وبلدة.`);
+        console.log(`✅ اكتملت المزامنة بنجاح: تم تخزين ${allNeighbourhoods.length} حي وبلدة.`);
         isTreeBuilding = false;
         return cachedGeographicTree;
     } catch (err) {
@@ -100,7 +119,6 @@ app.get('/api/locations-tree', async (req, res) => {
         return res.json({ status: "success", data: cachedGeographicTree });
     }
     
-    // بناء الشجرة إن لم تكن جاهزة
     const tree = await buildFullTree();
     if (tree) {
         res.json({ status: "success", data: tree });
@@ -127,6 +145,5 @@ app.post('/api/:action', async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server started on port ${PORT}`);
-    // بدء المزامنة فور تشغيل الخادم
     buildFullTree();
 });
