@@ -43,7 +43,7 @@ const orderSchema = new mongoose.Schema({
     netMerchantAmount: { type: Number, default: 0 },
     codAmount: { type: Number, default: 0 },
     customerNotes: { type: String, default: "" },
-    originBranch: { type: String, default: "دمشق" },
+    originBranch: { type: String, default: "طرطوس - المحطة" }, // مثبت على فرع طرطوس
     barcodeRaw: { type: String, default: "" },
     barcodeSerial: { type: String, default: "" },
     barcodeCode: { type: String, default: "" },
@@ -76,10 +76,10 @@ app.get('/api/db-status', (req, res) => {
 });
 
 // ==========================================
-// 🛠️ مسارات إدارة الطلبات وقاعدة البيانات
+// 🛠️ مسارات إدارة الطلبات
 // ==========================================
 
-// 1. جلب الطلبات (حسب الحالة أو كود المسوقة)
+// 1. جلب الطلبات
 app.get('/api/orders', async (req, res) => {
     try {
         const { status, marketerCode } = req.query;
@@ -94,7 +94,7 @@ app.get('/api/orders', async (req, res) => {
     }
 });
 
-// 2. حفظ / إنشاء طلب جديد في قاعدة البيانات
+// 2. حفظ / تحديث طلب في قاعدة البيانات
 app.post('/api/orders/save', async (req, res) => {
     try {
         const orderData = req.body;
@@ -111,22 +111,20 @@ app.post('/api/orders/save', async (req, res) => {
     }
 });
 
-// 3. الحذف المزدوج (إلغاء من بابل إكسبريس وحذف من قاعدة البيانات)
+// 3. الحذف المزدوج (إلغاء من بابل إكسبريس وحذف من MongoDB)
 app.post('/api/orders/delete', async (req, res) => {
     try {
         const { id, awb } = req.body;
 
-        // إذا كان الطلب مرسلاً ومعه بوليصة AWB، نلغيه أولاً من بابل إكسبريس
         if (awb && awb.trim().length > 0) {
             try {
                 await axios.post(`${BABEL_API_URL}/deleteShipment`, { awb: awb.trim() }, { headers, timeout: 10000 });
-                console.log(`تم إلغاء الشحنة في بابل إكسبريس بنجاح: ${awb}`);
+                console.log(`تم إلغاء الشحنة في بابل إكسبريس: ${awb}`);
             } catch (babelErr) {
                 console.warn(`تحذير أثناء الإلغاء في بابل: ${babelErr.message}`);
             }
         }
 
-        // الحذف من قاعدة البيانات
         if (id) {
             await Order.findByIdAndDelete(id);
         } else if (awb) {
@@ -139,7 +137,7 @@ app.post('/api/orders/delete', async (req, res) => {
     }
 });
 
-// 4. تتبع وتحديث حالة الشحنة من بابل إكسبريس وتخزينها في MongoDB
+// 4. تتبع وتحديث حالة الشحنة
 app.post('/api/orders/track', async (req, res) => {
     try {
         const { id, awb } = req.body;
@@ -176,7 +174,7 @@ app.post('/api/orders/track', async (req, res) => {
     }
 });
 
-// 5. جلب إحصائيات وحسابات مسوقة محددة
+// 5. حسابات مسوقة محددة
 app.get('/api/marketers/:code/stats', async (req, res) => {
     try {
         const code = req.params.code;
@@ -187,7 +185,6 @@ app.get('/api/marketers/:code/stats', async (req, res) => {
         const inTransitOrders = allOrders.filter(o => o.orderStatus === 'sent' && !o.shipmentStatusText.includes('تم التسليم') && !o.shipmentStatusText.includes('مرتجع'));
         const paidOrders = allOrders.filter(o => o.commissionStatus === 'paid');
 
-        // حساب مجموع العمولات المستحقة للطلبات المسلمة التي لم تُدفع بعد
         const unpaidCommissionSum = deliveredOrders
             .filter(o => o.commissionStatus !== 'paid')
             .reduce((sum, o) => sum + (o.commission || 0), 0);
@@ -214,13 +211,12 @@ app.get('/api/marketers/:code/stats', async (req, res) => {
     }
 });
 
-// 6. تصفير عمولات مسوقة وتحديث حالتها إلى مدفوعة
+// 6. تصفير عمولات مسوقة
 app.post('/api/marketers/:code/settle', async (req, res) => {
     try {
         const code = req.params.code;
         const now = new Date();
 
-        // تحديث الطلبات المسلمة فقط التي لم تكن مدفوعة
         const result = await Order.updateMany(
             {
                 marketerCode: code,
