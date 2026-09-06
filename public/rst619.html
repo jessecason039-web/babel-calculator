@@ -881,7 +881,7 @@
     }
 
     // ==========================================
-    // 4. الموافقة والتصدير إلى بابل إكسبريس (مع فرع طرطوس الثابت)
+    // 4. الموافقة والتصدير إلى بابل إكسبريس (تضمين الباركود والسيريال والرمز في أجزاء الشحنة)
     // ==========================================
     async function approveAndSubmitOrder(index) {
         const o = pendingOrders[index];
@@ -895,12 +895,20 @@
 
         let phone = o.customerPhone.replace(/\s+/g, '').replace('+963', '').replace(/^0/, '');
 
-        // جلب معرف حي "المحطة" في طرطوس
+        // جلب معرف حي "المحطة" في طرطوس للمرسل
         const tartusNeighbourhood = allNeighbourhoodsList.find(n =>
             (n.name.includes("المحطة") || normalizeAr(n.name).includes("المحطه")) &&
             (n.cityName.includes("طرطوس") || n.areaName.includes("طرطوس"))
         );
         const senderNeighbourhoodId = tartusNeighbourhood ? tartusNeighbourhood.id : 100;
+
+        // تجهيز بيانات جزء الشحنة متضمناً السيريال والرمز والباركود
+        const partData = {
+            weight: 1
+        };
+        if (o.barcodeSerial) partData.serial = o.barcodeSerial;
+        if (o.barcodeCode) partData.code = o.barcodeCode;
+        if (o.barcodeRaw) partData.barcode = o.barcodeRaw;
 
         const payload = {
             shipment: {
@@ -924,16 +932,16 @@
                     neighbourhood: { id: parseInt(o.neighbourhoodId) }
                 },
                 type: "envelope",
-                parts: [{ weight: 1 }],
+                parts: [partData], // تمرير الباركود والسيريال والرمز مع الوزن
                 contents: o.niche || "بديل ذهب",
                 deliveryType: "address",
-                pickupType: "hub", // استلام من المركز الأقرب للتاجر
+                pickupType: "hub",
                 reference: "",
                 cod: {
                     amount: o.codAmount,
                     currency: "SYP"
                 },
-                payer: "receiver" // المستلم يدفع
+                payer: "receiver"
             }
         };
 
