@@ -249,13 +249,6 @@
             gap: 8px;
         }
 
-        .price-sub {
-            font-size: 13px;
-            color: #059669;
-            margin-top: 4px;
-            font-weight: 600;
-        }
-
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(-4px); }
             to { opacity: 1; transform: translateY(0); }
@@ -704,19 +697,18 @@
     }
 
     // ==========================================
-    // 7. حساب أجور توصيل الظرف حصراً (Envelope Dropoff Only)
+    // 7. حساب أجور التوصيل مع التمييز الذكي للمحافظات
     // ==========================================
     async function autoCalculateDeliveryFee(neighbourhoodId) {
         const resultBox = document.getElementById('resultBox');
         showLoadingPrice();
 
-        // إرسال نوع الشحنة كـ ظرف حصراً بوزن 1 كغ
         const payload = {
             delivery: {
                 receiver: {
                     neighbourhood: { id: parseInt(neighbourhoodId) }
                 },
-                type: "envelope",
+                type: "envelope", // ظرف حصراً
                 parts: [{ weight: 1 }],
                 deliveryType: "address",
                 payer: "receiver"
@@ -726,17 +718,31 @@
         try {
             const data = await api('calculatePrice', payload);
             if (data.status === 'success') {
-                // استخراج أجرة توصيل الظرف للعنوان حصراً (Dropoff)
-                const deliveryFee = data.details && data.details.dropoff !== undefined ? data.details.dropoff : 0;
+                // استخراج اسم المدينة المختارة
+                const citySelect = document.getElementById('citySelect');
+                let selectedCityName = "";
+                if (citySelect && citySelect.selectedIndex >= 0) {
+                    selectedCityName = citySelect.options[citySelect.selectedIndex].text || "";
+                }
+
+                // فحص ما إذا كانت المدينة هي (دمشق، طرطوس، ريف دمشق)
+                const localBranches = ["دمشق", "طرطوس", "ريف دمشق"];
+                const isLocal = localBranches.some(branch => selectedCityName.includes(branch));
+
+                let finalFee = 0;
+                if (isLocal) {
+                    // للمحافظات المغطاة بفروعك: أجور التوصيل فقط
+                    finalFee = (data.details && data.details.dropoff !== undefined) ? data.details.dropoff : (data.price || 0);
+                } else {
+                    // لباقي المحافظات: التكلفة الإجمالية (شحن + توصيل) مدمجة بالكامل كرقم واحد
+                    finalFee = data.price || 0;
+                }
 
                 resultBox.className = 'result-box success';
                 resultBox.innerHTML = `
-                    <div style="font-size: 14px; font-weight: 700; color: #065f46; margin-bottom: 4px;">✉️ أجور توصيل الظرف إلى عنوان الزبون:</div>
+                    <div style="font-size: 14px; font-weight: 700; color: #065f46; margin-bottom: 4px;">✉️ أجور التوصيل إلى عنوان الزبون:</div>
                     <div class="price-highlight">
-                        ${deliveryFee.toLocaleString()} <span style="font-size: 18px;">${data.currency}</span>
-                    </div>
-                    <div class="price-sub">
-                        (أجرة التوصيل للعنوان فقط - شحنة ظرف حصراً)
+                        ${finalFee.toLocaleString()} <span style="font-size: 18px;">${data.currency}</span>
                     </div>
                 `;
             } else {
