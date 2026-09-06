@@ -6,6 +6,7 @@
     <title>لوحة التاجر - إدارة وتجهيز الشحنات والفواتير</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+    <!-- مكتبة دمج ملفات الـ PDF السحابية للطباعة المجمعة -->
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 
     <style>
@@ -59,6 +60,7 @@
             color: var(--dark);
         }
 
+        /* شريط التبويبات */
         .tabs-nav {
             display: flex;
             gap: 8px;
@@ -94,6 +96,7 @@
             box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25);
         }
 
+        /* صندوق الإدخال الجماعي */
         .bulk-textarea {
             width: 100%;
             height: 180px;
@@ -128,6 +131,7 @@
 
         .btn-parse:hover { background: var(--primary-hover); }
 
+        /* شبكة البطاقات */
         .cards-grid {
             display: flex;
             flex-direction: column;
@@ -301,6 +305,7 @@
 
         .btn-delete:hover { background: #fca5a5; }
 
+        /* شريط التحكم بالطباعة المجمعة */
         .batch-toolbar {
             background: #f8fafc;
             border: 1.5px solid var(--gray-200);
@@ -314,6 +319,7 @@
             gap: 12px;
         }
 
+        /* نافذة التأكيد */
         .modal-overlay {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -364,6 +370,7 @@
             cursor: pointer;
         }
 
+        /* إحصائيات المسوقات */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -487,6 +494,7 @@
                 </div>
             </div>
 
+            <!-- بطاقة التصفير -->
             <div style="background:#ecfdf5; border:2px solid #10b981; padding:20px; border-radius:12px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
                 <div>
                     <div style="font-size:14px; font-weight:700; color:#065f46;">💰 مجموع النسب المستحقة للدفع (للطلبات المسلمة فقط):</div>
@@ -503,6 +511,7 @@
     </div>
 </div>
 
+<!-- نافذة التأكيد لتصفير الحساب -->
 <div id="settleModal" class="modal-overlay">
     <div class="modal-card">
         <h3 style="margin-top:0; color:var(--dark);">⚠️ تأكيد عملية تصفير ودفع النسب</h3>
@@ -516,6 +525,7 @@
 
 <script>
     let allNeighbourhoodsList = [];
+    let citiesList = [];
     let pendingOrders = [];
     let loadedSentOrdersList = [];
     let currentMarketerReportCode = "";
@@ -537,6 +547,7 @@
             const data = await res.json();
             if (data.status === 'success' && data.data) {
                 allNeighbourhoodsList = data.data.neighbourhoods || [];
+                citiesList = data.data.cities || [];
             }
         } catch (e) {}
     }
@@ -569,7 +580,7 @@
         const rawOrders = rawText.split(/(?=#طلب_توصيل|#طلب)/g).map(t => t.trim()).filter(t => t.length > 10);
         if (rawOrders.length === 0) return alert("لم يتم العثور على صيغة #طلب_توصيل في النص!");
 
-        alert(`⏳ جاري تحليل ${rawOrders.length} طلب وحساب التكاليف الفعلية ومطابقة الأحياء...`);
+        alert(`⏳ جاري تحليل ${rawOrders.length} طلب وحساب التكاليف ومطابقة المحافظات والأحياء...`);
 
         for (let text of rawOrders) {
             const parsed = parseSingleOrderText(text);
@@ -645,17 +656,55 @@
         return obj;
     }
 
+    // ==========================================
+    // محرك مطابقة العناوين الهرمي الذكي (Scored Matching)
+    // ==========================================
     async function matchAndCalculateOrder(order) {
         const normAddr = normalizeAr(order.customerAddress);
-        let matched = null;
+        let candidates = [];
+
+        // الكشف عن المحافظات المذكورة في نص العنوان
+        const detectedCitiesInText = citiesList.filter(c => normAddr.includes(normalizeAr(c.name)));
 
         for (let item of allNeighbourhoodsList) {
             const normN = normalizeAr(item.name);
-            if (normN.length >= 3 && normAddr.includes(normN)) {
-                matched = item;
-                break;
+            const normCity = normalizeAr(item.cityName);
+            const normArea = normalizeAr(item.areaName);
+
+            // فحص هل اسم الحي موجود في العنوان
+            if (normN.length >= 3 && (normAddr.includes(normN) || normN.includes(normAddr))) {
+                let score = 10; // نقطة أساسية لمطابقة اسم الحي
+
+                // بونص مطابقة المحافظة (مثل: طرطوس)
+                if (normCity && normAddr.includes(normCity)) {
+                    score += 100;
+                }
+
+                // بونص مطابقة المنطقة الإدارية (مثل: مدينة طرطوس)
+                if (normArea && normAddr.includes(normArea)) {
+                    score += 50;
+                }
+
+                // بونص التطابق الكامل (المحافظة + المنطقة + الحي معاً)
+                if (normCity && normArea && normAddr.includes(normCity) && normAddr.includes(normArea)) {
+                    score += 200;
+                }
+
+                // خصم كبير إذا كان العنوان يحدد محافظة معينة بينما هذا الحي يتبع لمحافظة ثانية
+                if (detectedCitiesInText.length > 0) {
+                    const isSameCity = detectedCitiesInText.some(c => c.id === item.cityId || normalizeAr(c.name) === normCity);
+                    if (!isSameCity) {
+                        score -= 500; // استبعاد أحياء المحافظات الأخرى (مثل محطة حمص عند طلب طرطوس)
+                    }
+                }
+
+                candidates.push({ item, score });
             }
         }
+
+        // ترتيب المرشحين واختيار الأعلى نقاطاً
+        candidates.sort((a, b) => b.score - a.score);
+        let matched = (candidates.length > 0 && candidates[0].score > 0) ? candidates[0].item : null;
 
         if (matched) {
             order.neighbourhoodId = matched.id;
@@ -782,12 +831,14 @@
 
         let phone = o.customerPhone.replace(/\s+/g, '').replace('+963', '').replace(/^0/, '');
 
+        // معرف حي المحطة في طرطوس للمرسل
         const tartusNeighbourhood = allNeighbourhoodsList.find(n =>
             (n.name.includes("المحطة") || normalizeAr(n.name).includes("المحطه")) &&
             (n.cityName.includes("طرطوس") || n.areaName.includes("طرطوس"))
         );
         const senderNeighbourhoodId = tartusNeighbourhood ? tartusNeighbourhood.id : 100;
 
+        // تمرير ملاحظات الزبون في سطر العنوان التفصيلي لتطبع على البوليصة
         const detailedAddress = (o.customerNotes && o.customerNotes.trim().length > 0)
             ? o.customerNotes.trim()
             : (o.customerAddress || "لا توجد ملاحظات إضافية");
@@ -962,7 +1013,6 @@
                     copiedPages.forEach(page => mergedPdf.addPage(page));
                     successCount++;
 
-                    // تحديث الحالة فوراً في الذاكرة والقاعدة
                     await markOrderPrintedInDb(awb);
                 }
             } catch (err) {}
@@ -1009,7 +1059,6 @@
                 const fileBlob = new Blob([byteArray], { type: 'application/pdf' });
                 const fileURL = URL.createObjectURL(fileBlob);
 
-                // تحديث الحالة فوراً وتلوين الشارة بالأخضر
                 await markOrderPrintedInDb(awb);
                 loadSentOrders();
 
@@ -1036,7 +1085,6 @@
             order.isPrinted = true;
             order.printedAt = new Date();
             
-            // تحديث فوري للشارة على الشاشة
             const badgeEl = document.getElementById(`badge_${awb}`);
             if (badgeEl) {
                 badgeEl.outerHTML = `<span id="badge_${awb}" style="background:#ecfdf5; color:#047857; font-size:12px; padding:3px 8px; border-radius:6px; font-weight:800; border:1px solid #a7f3d0;">🖨️ تمت الطباعة ✅</span>`;
