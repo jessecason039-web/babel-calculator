@@ -6,6 +6,8 @@
     <title>لوحة التاجر - إدارة وتجهيز الشحنات والفواتير</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+    <!-- مكتبة دمج ملفات الـ PDF السحابية للطباعة المجمعة -->
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 
     <style>
         :root {
@@ -241,6 +243,7 @@
             justify-content: flex-end;
             margin-top: 14px;
             flex-wrap: wrap;
+            align-items: center;
         }
 
         .btn-approve {
@@ -273,6 +276,22 @@
 
         .btn-pdf:hover { background: #0369a1; }
 
+        .btn-batch {
+            background: #047857;
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 800;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-batch:hover { background: #065f46; }
+
         .btn-delete {
             background: #fee2e2;
             color: #dc2626;
@@ -285,6 +304,20 @@
         }
 
         .btn-delete:hover { background: #fca5a5; }
+
+        /* شريط التحكم بالطباعة المجمعة */
+        .batch-toolbar {
+            background: #f8fafc;
+            border: 1.5px solid var(--gray-200);
+            border-radius: 12px;
+            padding: 12px 18px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
 
         /* نافذة التأكيد */
         .modal-overlay {
@@ -366,7 +399,7 @@
     <div class="header">
         <div>
             <h1>📦 لوحة إدارة ومعالجة الطلبات وتوليد الفواتير (التاجر)</h1>
-            <div style="font-size:13px; color:var(--gray-600); margin-top:3px;">نظام الفرز المالي الفوري، تصدير الشحنات، وطباعة بوالص PDF الرسمية</div>
+            <div style="font-size:13px; color:var(--gray-600); margin-top:3px;">نظام الفرز المالي، تصدير الشحنات، والطباعة المجمعة لبوالص PDF الرسمية</div>
         </div>
         <div id="dbLiveIndicator" style="font-size:12px; font-weight:700; color:var(--success);">🟢 متصل بـ MongoDB</div>
     </div>
@@ -410,12 +443,25 @@
         </div>
     </div>
 
-    <!-- 3. الطلبات المرسلة والتتبع وطباعة الفواتير -->
+    <!-- 3. الطلبات المرسلة والطباعة المجمعة -->
     <div id="sentTab" class="tab-content" style="display:none;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
             <h3 style="margin:0;">سجل الشحنات المصدرة إلى بابل إكسبريس (الفواتير)</h3>
-            <button class="btn-pdf" onclick="loadSentOrders()">🔄 تحديث القائمة</button>
+            <button class="btn-pdf" style="background:#475569;" onclick="loadSentOrders()">🔄 تحديث القائمة</button>
         </div>
+
+        <!-- شريط أدوات الطباعة المجمعة -->
+        <div class="batch-toolbar">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAllSent(this.checked)" style="width:18px; height:18px; cursor:pointer;">
+                <label for="selectAllCheckbox" style="font-weight:800; cursor:pointer; margin:0;">تحديد الكل</label>
+            </div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <button class="btn-batch" onclick="printUnprintedOnly()">⚡ طباعة غير المطبوع فقط بملف واحد</button>
+                <button class="btn-pdf" onclick="printSelectedBatch()">🖨️ طباعة الفواتير المحددة بملف واحد</button>
+            </div>
+        </div>
+
         <div id="sentOrdersList" class="cards-grid"></div>
     </div>
 
@@ -481,6 +527,7 @@
 <script>
     let allNeighbourhoodsList = [];
     let pendingOrders = [];
+    let loadedSentOrdersList = [];
     let currentMarketerReportCode = "";
     let currentMarketerDueAmount = 0;
 
@@ -663,7 +710,7 @@
     }
 
     // ==========================================
-    // 2. بطاقات قيد المراجعة (مع إظهار ملاحظات الزبون للتسليم)
+    // 2. بطاقات قيد المراجعة
     // ==========================================
     function renderPendingCards() {
         const container = document.getElementById('pendingCardsList');
@@ -745,14 +792,12 @@
 
         let phone = o.customerPhone.replace(/\s+/g, '').replace('+963', '').replace(/^0/, '');
 
-        // معرف حي المحطة في طرطوس للمرسل
         const tartusNeighbourhood = allNeighbourhoodsList.find(n =>
             (n.name.includes("المحطة") || normalizeAr(n.name).includes("المحطه")) &&
             (n.cityName.includes("طرطوس") || n.areaName.includes("طرطوس"))
         );
         const senderNeighbourhoodId = tartusNeighbourhood ? tartusNeighbourhood.id : 100;
 
-        // وضع ملاحظات الزبون في خانة العنوان التفصيلي لتطبع على البوليصة للمندوب
         const detailedAddress = (o.customerNotes && o.customerNotes.trim().length > 0)
             ? o.customerNotes.trim()
             : (o.customerAddress || "لا توجد ملاحظات إضافية");
@@ -768,7 +813,7 @@
                 receiver: {
                     name: o.customerName,
                     phone: { country: "963", phone: phone },
-                    address: detailedAddress, // تمرير الملاحظة هنا مباشرة
+                    address: detailedAddress,
                     neighbourhood: { id: parseInt(o.neighbourhoodId) }
                 },
                 type: "envelope",
@@ -791,6 +836,7 @@
                 o.awb = res.awb;
                 o.orderStatus = "sent";
                 o.shipmentStatusText = "تم تكوين الشحنة";
+                o.isPrinted = false;
 
                 await api('orders/save', o);
 
@@ -814,7 +860,7 @@
     }
 
     // ==========================================
-    // 4. الطلبات المرسلة والتتبع وطباعة الـ PDF المباشرة
+    // 4. الطلبات المرسلة والطباعة المجمعة والمفردة
     // ==========================================
     async function loadSentOrders() {
         const container = document.getElementById('sentOrdersList');
@@ -823,29 +869,37 @@
         try {
             const res = await fetch('/api/orders');
             const data = await res.json();
-            const sent = (data.orders || []).filter(o => o.orderStatus !== 'pending');
+            loadedSentOrdersList = (data.orders || []).filter(o => o.orderStatus !== 'pending');
 
-            if (sent.length === 0) {
+            if (loadedSentOrdersList.length === 0) {
                 container.innerHTML = '<div style="text-align:center; padding:30px; color:var(--gray-600);">لا توجد شحنات مرسلة حتى الآن.</div>';
                 return;
             }
 
             container.innerHTML = '';
-            sent.forEach(o => {
+            loadedSentOrdersList.forEach((o, index) => {
                 let badgeColor = "#0284c7";
                 if (o.orderStatus === 'delivered' || o.shipmentStatusText.includes('تم التسليم')) badgeColor = "#10b981";
                 if (o.orderStatus === 'returned' || o.shipmentStatusText.includes('مرتجع')) badgeColor = "#ef4444";
+
+                const isPrintedBadge = o.isPrinted
+                    ? `<span style="background:#ecfdf5; color:#047857; font-size:12px; padding:3px 8px; border-radius:6px; font-weight:800; border:1px solid #a7f3d0;">🖨️ تمت الطباعة ✅</span>`
+                    : `<span style="background:#fff7ed; color:#c2410c; font-size:12px; padding:3px 8px; border-radius:6px; font-weight:800; border:1px solid #fed7aa;">⏳ بانتظار الطباعة</span>`;
 
                 const card = document.createElement('div');
                 card.className = 'order-card';
                 card.innerHTML = `
                     <div class="card-top">
-                        <div>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <input type="checkbox" class="sent-order-chk" value="${o.awb}" data-index="${index}" style="width:18px; height:18px; cursor:pointer;">
                             <span class="marketer-tag">👩‍💼 ${o.marketerCode}</span>
-                            <strong style="margin-right:10px;">${o.customerName}</strong> (${o.customerPhone})
+                            <strong style="margin-right:4px;">${o.customerName}</strong> (${o.customerPhone})
                         </div>
-                        <div style="font-size:13px; font-weight:800; background:#f1f5f9; padding:4px 10px; border-radius:6px;">
-                            AWB: <span style="color:#0284c7;">${o.awb}</span>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            ${isPrintedBadge}
+                            <div style="font-size:13px; font-weight:800; background:#f1f5f9; padding:4px 10px; border-radius:6px;">
+                                AWB: <span style="color:#0284c7;">${o.awb}</span>
+                            </div>
                         </div>
                     </div>
 
@@ -862,7 +916,7 @@
                     <div class="card-actions" style="margin-top:12px;">
                         <button class="btn-delete" onclick="deleteSentOrder('${o._id}', '${o.awb}')">🗑️ إلغاء وحذف الشحنة</button>
                         <button class="btn-pdf" style="background:#475569;" onclick="trackSingleAwb('${o._id}', '${o.awb}')">🔄 تحديث الحالة من بابل</button>
-                        <button class="btn-pdf" onclick="printAwbPdf('${o.awb}')">🖨️ طباعة الفاتورة / الإيصال PDF</button>
+                        <button class="btn-pdf" onclick="printSingleAwbPdf('${o.awb}', ${index})">🖨️ طباعة الفاتورة PDF</button>
                     </div>
                 `;
                 container.appendChild(card);
@@ -872,12 +926,86 @@
         }
     }
 
-    async function printAwbPdf(awb) {
+    function toggleSelectAllSent(isChecked) {
+        document.querySelectorAll('.sent-order-chk').forEach(chk => chk.checked = isChecked);
+    }
+
+    // طباعة الفواتير غير المطبوعة فقط بملف مدمج
+    async function printUnprintedOnly() {
+        const unprinted = loadedSentOrdersList.filter(o => !o.isPrinted && o.awb);
+        if (unprinted.length === 0) {
+            return alert("جميع الفواتير المرسلة تم طباعتها مسبقاً! لا توجد فواتير جديدة.");
+        }
+        const awbList = unprinted.map(o => o.awb);
+        await mergeAndPrintAwbs(awbList, `طباعة ${awbList.length} فاتورة جديدة غير مطبوعة`);
+    }
+
+    // طباعة الفواتير المحددة بالمربعات بملف مدمج
+    async function printSelectedBatch() {
+        const checkedBoxes = document.querySelectorAll('.sent-order-chk:checked');
+        if (checkedBoxes.length === 0) {
+            return alert("يرجى تحديد فاتورة واحدة على الأقل عبر مربعات الاختيار!");
+        }
+        const awbList = Array.from(checkedBoxes).map(chk => chk.value);
+        await mergeAndPrintAwbs(awbList, `طباعة ${awbList.length} فاتورة محددة`);
+    }
+
+    // المحرك المتقدم لدمج ملفات الـ PDF وتوليد ملف واحد متعدد الصفحات
+    async function mergeAndPrintAwbs(awbList, title = "") {
+        if (!confirm(`هل تريد ${title} في ملف PDF واحد متتابع؟`)) return;
+
+        const { PDFDocument } = PDFLib;
+        const mergedPdf = await PDFDocument.create();
+        let successCount = 0;
+
+        alert(`⏳ جاري جلب ودمج ${awbList.length} فاتورة، يرجى الانتظار ثوانٍ...`);
+
+        for (let awb of awbList) {
+            try {
+                const res = await api('getAWBPdf', { awb });
+                if (res.status === 'success' && res.base64) {
+                    const byteCharacters = atob(res.base64);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {
+                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    const pdfDoc = await PDFDocument.load(byteArray);
+                    const copiedPages = await mergedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
+                    copiedPages.forEach(page => mergedPdf.addPage(page));
+                    successCount++;
+
+                    // تحديث حالة الطلب إلى "تمت الطباعة" في قاعدة البيانات
+                    await markOrderPrintedInDb(awb);
+                }
+            } catch (err) {}
+        }
+
+        if (successCount > 0) {
+            const mergedPdfBytes = await mergedPdf.save();
+            const fileBlob = new Blob([mergedPdfBytes], { type: 'application/pdf' });
+            const fileURL = URL.createObjectURL(fileBlob);
+
+            const printWindow = window.open(fileURL, '_blank');
+            if (!printWindow) {
+                const downloadLink = document.createElement('a');
+                downloadLink.href = fileURL;
+                downloadLink.download = `Batch-AWB-${Date.now()}.pdf`;
+                downloadLink.click();
+            }
+            loadSentOrders(); // تحديث شارات الطباعة فوراً
+        } else {
+            alert("تعذر استخراج ملفات الـ PDF من بابل إكسبريس.");
+        }
+    }
+
+    // طباعة بوليصة مفردة مع وضع علامة تمت الطباعة
+    async function printSingleAwbPdf(awb, orderIndex) {
         if (!awb) return alert("لا يوجد رقم بوليصة متاح للطباعة!");
-        
+
         const btn = event.currentTarget;
         const originalText = btn.innerText;
-        btn.innerText = "⏳ جاري استخراج ملف الـ PDF...";
+        btn.innerText = "⏳ جاري جلب الـ PDF...";
         btn.disabled = true;
 
         try {
@@ -895,6 +1023,10 @@
                 const fileBlob = new Blob([byteArray], { type: 'application/pdf' });
                 const fileURL = URL.createObjectURL(fileBlob);
 
+                // وضع علامة تمت الطباعة في قاعدة البيانات
+                await markOrderPrintedInDb(awb);
+                loadSentOrders();
+
                 const printWindow = window.open(fileURL, '_blank');
                 if (!printWindow) {
                     const downloadLink = document.createElement('a');
@@ -909,6 +1041,15 @@
             btn.innerText = originalText;
             btn.disabled = false;
             window.open(`https://www.babel-express.com/api/v1/documents/awb.php?uid=${awb}`, '_blank');
+        }
+    }
+
+    async function markOrderPrintedInDb(awb) {
+        const order = loadedSentOrdersList.find(o => o.awb === awb);
+        if (order) {
+            order.isPrinted = true;
+            order.printedAt = new Date();
+            await api('orders/save', order);
         }
     }
 
