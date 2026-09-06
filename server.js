@@ -7,13 +7,21 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ⚙️ رابط قاعدة بيانات MongoDB Atlas الخاصة بك
-const MONGO_URI = "mongodb+srv://jessecason039_db_user:0nWuR26w5Y8NHpBH@cluster0.l7h705q.mongodb.net/babel_orders?retryWrites=true&w=majority";
+// ⚙️ رابط قاعدة بيانات MongoDB بعد تصحيح كلمة المرور الدقيقة (U كبيرة)
+const MONGO_URI = "mongodb+srv://jessecason039_db_user:0nWUr26w5Y8NHpBH@cluster0.l7h705q.mongodb.net/babel_orders?retryWrites=true&w=majority&appName=Cluster0";
+
+let dbError = null;
 
 // 🔌 الاتصال بقاعدة البيانات
 mongoose.connect(MONGO_URI)
-  .then(() => console.log("✅ تم الاتصال بقاعدة بيانات MongoDB بنجاح!"))
-  .catch(err => console.error("❌ خطأ في الاتصال بقاعدة البيانات:", err.message));
+  .then(() => {
+      dbError = null;
+      console.log("✅ تم الاتصال بقاعدة بيانات MongoDB بنجاح!");
+  })
+  .catch(err => {
+      dbError = err.message;
+      console.error("❌ خطأ في الاتصال بقاعدة البيانات:", err.message);
+  });
 
 // بيانات بابل إكسبريس
 const BABEL_USER = "Mohamed_Mostafa";
@@ -28,7 +36,8 @@ app.get('/api/db-status', (req, res) => {
     const isConnected = mongoose.connection.readyState === 1;
     res.json({
         database: isConnected ? "متصلة بنجاح ✅" : "غير متصلة ❌",
-        status: isConnected ? "connected" : "disconnected"
+        status: isConnected ? "connected" : "disconnected",
+        details: isConnected ? "All good" : dbError
     });
 });
 
