@@ -506,6 +506,7 @@
                 </div>
             </div>
 
+            <!-- بطاقة التصفير -->
             <div style="background:#ecfdf5; border:2px solid #10b981; padding:20px; border-radius:12px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
                 <div>
                     <div style="font-size:14px; font-weight:700; color:#065f46;">💰 مجموع النسب المستحقة للدفع (للطلبات المسلمة فقط):</div>
@@ -522,6 +523,7 @@
     </div>
 </div>
 
+<!-- نافذة التأكيد لتصفير الحساب -->
 <div id="settleModal" class="modal-overlay">
     <div class="modal-card">
         <h3 style="margin-top:0; color:var(--dark);">⚠️ تأكيد عملية تصفير ودفع النسب</h3>
@@ -673,7 +675,7 @@
     }
 
     // ==========================================
-    // محرك مطابقة العناوين الهرمي الذكي (Scored Matching)
+    // محرك مطابقة العناوين وحساب الأسعار الموحد
     // ==========================================
     async function matchAndCalculateOrder(order) {
         const normAddr = normalizeAr(order.customerAddress);
@@ -733,14 +735,10 @@
                 });
 
                 if (res.status === 'success') {
-                    const localBranches = ["دمشق", "طرطوس", "ريف دمشق"];
-                    const isLocal = localBranches.some(b => matched.cityName.includes(b));
-
-                    if (isLocal) {
-                        order.actualDeliveryFee = res.details?.dropoff || res.price || 0;
-                    } else {
-                        order.actualDeliveryFee = res.price || 0;
-                    }
+                    // حساب طبيعي وموحد لجميع محافظات سوريا من تسعيرة بابل مباشرة
+                    order.actualDeliveryFee = res.price || 0;
+                } else {
+                    order.actualDeliveryFee = order.statedDeliveryFee;
                 }
             } catch (e) {
                 order.actualDeliveryFee = order.statedDeliveryFee;
@@ -826,7 +824,7 @@
     }
 
     // ==========================================
-    // 3. دالة إرسال شحنة مفردة إلى بابل (Reusable Core)
+    // 3. دالة إرسال الشحنة (تفعيل isNewSYP: true)
     // ==========================================
     async function submitSingleOrderPayloadToBabel(o) {
         if (!o.neighbourhoodId) {
@@ -867,7 +865,8 @@
                 reference: "",
                 cod: {
                     amount: o.codAmount,
-                    currency: "SYP"
+                    currency: "SYP",
+                    isNewSYP: true // إعلام بابل بأن المبلغ بالليرة السورية الجديدة
                 },
                 payer: "receiver"
             }
@@ -891,7 +890,6 @@
         }
     }
 
-    // موافقة وتصدير طلب مفرد
     async function approveAndSubmitSingleOrder(index) {
         const btn = event.currentTarget;
         const origText = btn.innerText;
@@ -914,9 +912,6 @@
         }
     }
 
-    // ==========================================
-    // 🚀 تصدير جميع الطلبات دفعة واحدة إلى بابل
-    // ==========================================
     async function exportAllPendingToBabel() {
         if (pendingOrders.length === 0) {
             return alert("لا توجد طلبات قيد المراجعة لتصديرها!");
@@ -964,7 +959,7 @@
     }
 
     // ==========================================
-    // 4. الطلبات المرسلة والطباعة المجمعة وحذف الكل
+    // 4. الطلبات المرسلة والطباعة المجمعة والمفردة
     // ==========================================
     async function loadSentOrders() {
         const container = document.getElementById('sentOrdersList');
@@ -1184,9 +1179,6 @@
         }
     }
 
-    // ==========================================
-    // 🗑️ دالة حذف وإلغاء جميع الشحنات المرسلة
-    // ==========================================
     async function clearAllSentOrders() {
         if (loadedSentOrdersList.length === 0) {
             return alert("لا توجد شحنات مرسلة لحذفها!");
