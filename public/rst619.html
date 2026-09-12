@@ -308,6 +308,7 @@
 
         .btn-delete:hover { background: #fca5a5; }
 
+        /* شريط التحكم بالطباعة المجمعة */
         .batch-toolbar {
             background: #f8fafc;
             border: 1.5px solid var(--gray-200);
@@ -450,14 +451,19 @@
         </div>
     </div>
 
-    <!-- 3. الطلبات المرسلة والطباعة المجمعة وحذف الكل -->
+    <!-- 3. الطلبات المرسلة والطباعة المجمعة والتحديث والحذف الذكي -->
     <div id="sentTab" class="tab-content" style="display:none;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
             <h3 style="margin:0;">سجل الشحنات المصدرة إلى بابل إكسبريس (الفواتير)</h3>
             <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                <button class="btn-pdf" style="background:#475569;" onclick="loadSentOrders()">🔄 تحديث القائمة</button>
-                <button onclick="clearAllSentOrders()" style="background:#fee2e2; border:1px solid #fecaca; color:#dc2626; font-weight:800; cursor:pointer; padding:9px 16px; border-radius:8px;">
-                    🗑️ حذف وإلغاء جميع الشحنات
+                <button class="btn-pdf" id="btnTrackAll" style="background:#0369a1;" onclick="trackAllSentOrders()">
+                    🔄 تحديث حالة جميع الشحنات من بابل
+                </button>
+                <button class="btn-pdf" style="background:#475569;" onclick="loadSentOrders()">
+                    تحديث القائمة
+                </button>
+                <button id="btnSmartDelete" onclick="handleSmartDeleteSentOrders()" style="background:#fee2e2; border:1px solid #fecaca; color:#dc2626; font-weight:800; cursor:pointer; padding:9px 16px; border-radius:8px;">
+                    🗑️ حذف وإلغاء الشحنات
                 </button>
             </div>
         </div>
@@ -506,7 +512,6 @@
                 </div>
             </div>
 
-            <!-- بطاقة التصفير -->
             <div style="background:#ecfdf5; border:2px solid #10b981; padding:20px; border-radius:12px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
                 <div>
                     <div style="font-size:14px; font-weight:700; color:#065f46;">💰 مجموع النسب المستحقة للدفع (للطلبات المسلمة فقط):</div>
@@ -735,7 +740,6 @@
                 });
 
                 if (res.status === 'success') {
-                    // حساب طبيعي وموحد لجميع محافظات سوريا من تسعيرة بابل مباشرة
                     order.actualDeliveryFee = res.price || 0;
                 } else {
                     order.actualDeliveryFee = order.statedDeliveryFee;
@@ -866,7 +870,7 @@
                 cod: {
                     amount: o.codAmount,
                     currency: "SYP",
-                    isNewSYP: true // إعلام بابل بأن المبلغ بالليرة السورية الجديدة
+                    isNewSYP: true
                 },
                 payer: "receiver"
             }
@@ -959,7 +963,7 @@
     }
 
     // ==========================================
-    // 4. الطلبات المرسلة والطباعة المجمعة والمفردة
+    // 4. الطلبات المرسلة والطباعة المجمعة والتحديث والحذف الذكي
     // ==========================================
     async function loadSentOrders() {
         const container = document.getElementById('sentOrdersList');
@@ -1166,6 +1170,36 @@
         }
     }
 
+    // ==========================================
+    // 🔄 تحديث حالة جميع الشحنات دفعة واحدة من بابل
+    // ==========================================
+    async function trackAllSentOrders() {
+        if (loadedSentOrdersList.length === 0) {
+            return alert("لا توجد شحنات مرسلة لتحديث حالتها!");
+        }
+
+        const btn = document.getElementById('btnTrackAll');
+        const origText = btn.innerText;
+        btn.disabled = true;
+
+        let updatedCount = 0;
+        for (let i = 0; i < loadedSentOrdersList.length; i++) {
+            const o = loadedSentOrdersList[i];
+            if (o.awb) {
+                btn.innerText = `⏳ جاري التحديث (${i + 1} من ${loadedSentOrdersList.length})...`;
+                try {
+                    await api('orders/track', { id: o._id, awb: o.awb });
+                    updatedCount++;
+                } catch (err) {}
+            }
+        }
+
+        btn.innerText = origText;
+        btn.disabled = false;
+        alert(`✅ تم تحديث حالة ${updatedCount} شحنة بنجاح من سيرفر بابل إكسبريس!`);
+        loadSentOrders();
+    }
+
     async function deleteSentOrder(id, awb) {
         if (!confirm(`تحذير هام:\nهل أنت متأكد من إلغاء الشحنة (${awb}) وسحبها من بابل إكسبريس وحذفها نهائياً؟`)) return;
         try {
@@ -1179,34 +1213,76 @@
         }
     }
 
-    async function clearAllSentOrders() {
+    // ==========================================
+    // 🗑️ زر الحذف الذكي (المحدد أو الكل)
+    // ==========================================
+    async function handleSmartDeleteSentOrders() {
         if (loadedSentOrdersList.length === 0) {
             return alert("لا توجد شحنات مرسلة لحذفها!");
         }
 
-        const count = loadedSentOrdersList.length;
-        const confirmMsg = `⚠️ تحذير شديد الخطورة:\nهل أنت متأكد تماماً من حذف وإلغاء جميع الشحنات المرسلة (${count} شحنة) دفعة واحدة؟\n\nسيتم سحبها وإلغاؤها نهائياً من حسابك في بابل إكسبريس وحذفها من قاعدة البيانات!`;
-        
-        if (!confirm(confirmMsg)) return;
-        if (!confirm("تأكيد أخير: هل تريد الاستمرار بحذف جميع الشحنات؟ لا يمكن التراجع عن هذا الإجراء.")) return;
+        const checkedBoxes = document.querySelectorAll('.sent-order-chk:checked');
 
-        const btn = event?.currentTarget;
-        const origText = btn ? btn.innerText : "";
-        if (btn) btn.innerText = "⏳ جاري الإلغاء والحذف...";
+        if (checkedBoxes.length > 0) {
+            // الشكل الأول: حذف الشحنات المحددة فقط
+            const selectedAwbs = Array.from(checkedBoxes).map(chk => chk.value);
+            const count = selectedAwbs.length;
 
-        let deletedCount = 0;
-        for (let o of loadedSentOrdersList) {
-            try {
-                await api('orders/delete', { id: o._id, awb: o.awb });
-                deletedCount++;
-            } catch (e) {
-                console.error("Error deleting sent order", o.awb, e);
+            if (!confirm(`⚠️ تأكيد الحذف المحدد:\nهل أنت متأكد من إلغاء وحذف الشحنات المحددة فقط (عددها: ${count} شحنة)؟\nسيتم إلغاؤها وسحبها من بابل إكسبريس وحذفها نهائياً من قاعدة البيانات.`)) {
+                return;
             }
-        }
 
-        if (btn) btn.innerText = origText;
-        alert(`✅ تم إلغاء وحذف ${deletedCount} شحنة بنجاح من بابل إكسبريس وقاعدة البيانات!`);
-        loadSentOrders();
+            const btn = document.getElementById('btnSmartDelete');
+            const origText = btn.innerText;
+            btn.innerText = "⏳ جاري الإلغاء والحذف...";
+            btn.disabled = true;
+
+            let deletedCount = 0;
+            for (let awb of selectedAwbs) {
+                const order = loadedSentOrdersList.find(o => o.awb === awb);
+                if (order) {
+                    try {
+                        await api('orders/delete', { id: order._id, awb: order.awb });
+                        deletedCount++;
+                    } catch (e) {}
+                }
+            }
+
+            btn.innerText = origText;
+            btn.disabled = false;
+            alert(`✅ تم إلغاء وحذف ${deletedCount} شحنة محددة بنجاح!`);
+            loadSentOrders();
+
+        } else {
+            // الشكل الثاني: حذف جميع الشحنات بالكامل
+            const totalCount = loadedSentOrdersList.length;
+
+            if (!confirm(`⚠️ تحذير شديد الخطورة:\nلم تقم بتحديد شحنات معينة بمربعات الاختيار!\nهل تريد حذف وإلغاء جميع الشحنات المرسلة بالكامل (عددها: ${totalCount} شحنة) دفعة واحدة؟\nسيتم سحبها وإلغاؤها من بابل وحذفها نهائياً من قاعدة البيانات.`)) {
+                return;
+            }
+
+            if (!confirm("تأكيد أخير ونهائي: هل تريد حقاً حذف جميع الشحنات بلا استثناء؟ لا يمكن التراجع عن هذا الإجراء.")) {
+                return;
+            }
+
+            const btn = document.getElementById('btnSmartDelete');
+            const origText = btn.innerText;
+            btn.innerText = "⏳ جاري حذف الكل...";
+            btn.disabled = true;
+
+            let deletedCount = 0;
+            for (let o of loadedSentOrdersList) {
+                try {
+                    await api('orders/delete', { id: o._id, awb: o.awb });
+                    deletedCount++;
+                } catch (e) {}
+            }
+
+            btn.innerText = origText;
+            btn.disabled = false;
+            alert(`✅ تم إلغاء وحذف جميع الشحنات (${deletedCount} شحنة) بنجاح!`);
+            loadSentOrders();
+        }
     }
 
     // ==========================================
