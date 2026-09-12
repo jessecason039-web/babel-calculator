@@ -48,12 +48,12 @@ const orderSchema = new mongoose.Schema({
     barcodeSerial: { type: String, default: "" },
     barcodeCode: { type: String, default: "" },
     awb: { type: String, default: "" },
-    orderStatus: { type: String, default: "pending" }, // pending, sent, delivered, returned, cancelled
+    orderStatus: { type: String, default: "pending" },
     shipmentStatusText: { type: String, default: "قيد المراجعة" },
-    commissionStatus: { type: String, default: "unpaid" }, // unpaid, paid
+    commissionStatus: { type: String, default: "unpaid" },
     paidAt: { type: Date, default: null },
-    isPrinted: { type: Boolean, default: false }, // تثبيت حالة الطباعة
-    printedAt: { type: Date, default: null },     // تاريخ ووقت الطباعة
+    isPrinted: { type: Boolean, default: false },
+    printedAt: { type: Date, default: null },
     createdAt: { type: Date, default: Date.now }
 });
 
@@ -113,17 +113,23 @@ app.post('/api/orders/save', async (req, res) => {
     }
 });
 
-// 3. الحذف المزدوج (إلغاء من بابل إكسبريس وحذف من MongoDB)
+// 3. الحذف الآمن (يشترط موافقة بابل أولاً ويمنع حذف الشحنات التي في المركز)
 app.post('/api/orders/delete', async (req, res) => {
     try {
         const { id, awb } = req.body;
 
         if (awb && awb.trim().length > 0) {
             try {
+                // محاولة الإلغاء في بابل إكسبريس أولاً
                 await axios.post(`${BABEL_API_URL}/deleteShipment`, { awb: awb.trim() }, { headers, timeout: 10000 });
                 console.log(`تم إلغاء الشحنة في بابل إكسبريس: ${awb}`);
             } catch (babelErr) {
-                console.warn(`تحذير أثناء الإلغاء في بابل: ${babelErr.message}`);
+                // إذا رفضت بابل الحذف لأنها في المركز أو قيد النقل، نوقف الحذف فوراً لحماية السجل
+                const errDetail = babelErr.response?.data?.errorMessage || babelErr.message;
+                return res.status(400).json({
+                    status: "error",
+                    message: `❌ رفضت بابل إكسبريس حذف الشحنة (${awb}) لأنها أصبحت بعهدة الشركة (في المركز أو قيد النقل). تم إيقاف الحذف لحماية سجلاتك.`
+                });
             }
         }
 
@@ -139,7 +145,63 @@ app.post('/api/orders/delete', async (req, res) => {
     }
 });
 
-// 4. تتبع وتحديث حالة الشحنة
+// 4. استرجاع شحنة محذوفة بالبوليصة AWB من بابل إكسبريس
+app.post('/api/orders/recover', async (req, res) => {
+    try {
+        const { awb } = req.body;
+        if (!awb || !awb.trim()) {
+            return res.status(400).json({ status: "error", message: "رقم البوليصة مطلوب" });
+        }
+        const cleanAwb = awb.trim();
+
+        // فحص هل الشحنة مسجلة مسبقاً
+        const existing = await Order.findOne({ awb: cleanAwb });
+        if (existing) {
+            return res.status(400).json({ status: "error", message: "هذه الشحنة موجودة بالفعل في السجل ولم تُحذف!" });
+        }
+
+        // جلب تفاصيل الشحنة الحية من بابل إكسبريس
+        const trackRes = await axios.post(`${BABEL_API_URL}/trackShipment`, { awb: cleanAwb }, { headers, timeout: 10000 });
+        if (trackRes.data && trackRes.data.status === 'success' && trackRes.data.tracking) {
+            const trk = trackRes.data.tracking;
+            const statusText = trk.shipmentStatus ? trk.shipmentStatus.text : "ضمن النقل";
+            const statusCode = trk.shipmentStatus ? trk.shipmentStatus.code : "";
+
+            let newOrderStatus = "sent";
+            if (trk.isDelivered || statusCode === 'Delivered') {
+                newOrderStatus = "delivered";
+            } else if (statusCode === 'ReturnedToSender' || statusCode === 'DeliveryFailed') {
+                newOrderStatus = "returned";
+            }
+
+            const recoveredOrder = new Order({
+                marketerCode: "مسترجعة",
+                niche: "بديل ذهب",
+                customerName: trk.to ? trk.to.name : "زبونة بابل",
+                customerPhone: "0900000000",
+                customerAddress: trk.to ? `${trk.to.city || ''} - ${trk.to.area || ''} - ${trk.to.neighbourhood || ''}` : "عنوان بابل",
+                cityName: trk.to ? trk.to.city : "",
+                areaName: trk.to ? trk.to.area : "",
+                neighbourhoodName: trk.to ? trk.to.neighbourhood : "",
+                awb: cleanAwb,
+                orderStatus: newOrderStatus,
+                shipmentStatusText: statusText,
+                isPrinted: true,
+                printedAt: new Date()
+            });
+
+            await recoveredOrder.save();
+            res.json({ status: "success", order: recoveredOrder, message: `✅ تم استرجاع الشحنة (${cleanAwb}) وتثبيتها بقاعدتك بنجاح!` });
+        } else {
+            res.status(404).json({ status: "error", message: "لم يتم العثور على شحنة بهذا الرقم في بابل إكسبريس" });
+        }
+    } catch (e) {
+        const msg = e.response?.data?.errorMessage || e.message;
+        res.status(500).json({ status: "error", message: `تعذر استرجاع الشحنة: ${msg}` });
+    }
+});
+
+// 5. تتبع وتحديث حالة الشحنة
 app.post('/api/orders/track', async (req, res) => {
     try {
         const { id, awb } = req.body;
@@ -176,7 +238,7 @@ app.post('/api/orders/track', async (req, res) => {
     }
 });
 
-// 5. حسابات مسوقة محددة
+// 6. حسابات مسوقة محددة
 app.get('/api/marketers/:code/stats', async (req, res) => {
     try {
         const code = req.params.code;
@@ -213,7 +275,7 @@ app.get('/api/marketers/:code/stats', async (req, res) => {
     }
 });
 
-// 6. تصفير عمولات مسوقة
+// 7. تصفير عمولات مسوقة
 app.post('/api/marketers/:code/settle', async (req, res) => {
     try {
         const code = req.params.code;
