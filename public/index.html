@@ -260,7 +260,7 @@
 <div class="container">
     <div class="header">
         <h1>✉️ حاسبة أجور توصيل الظروف (Envelope)</h1>
-        <p>نظام استعلام أجور التوصيل الصافية لعنوان الزبون </p>
+        <p>نظام استعلام أجور التوصيل الصافية لعنوان الزبون (بابل إكسبريس)</p>
     </div>
 
     <!-- 1. شريط البحث الشامل -->
@@ -697,7 +697,7 @@
     }
 
     // ==========================================
-    // 7. حساب أجور التوصيل مع التمييز الذكي للمحافظات
+    // 7. حساب أجور التوصيل الموحدة لجميع المحافظات
     // ==========================================
     async function autoCalculateDeliveryFee(neighbourhoodId) {
         const resultBox = document.getElementById('resultBox');
@@ -718,25 +718,8 @@
         try {
             const data = await api('calculatePrice', payload);
             if (data.status === 'success') {
-                // استخراج اسم المدينة المختارة
-                const citySelect = document.getElementById('citySelect');
-                let selectedCityName = "";
-                if (citySelect && citySelect.selectedIndex >= 0) {
-                    selectedCityName = citySelect.options[citySelect.selectedIndex].text || "";
-                }
-
-                // فحص ما إذا كانت المدينة هي (دمشق، طرطوس، ريف دمشق)
-                const localBranches = ["دمشق", "طرطوس", "ريف دمشق"];
-                const isLocal = localBranches.some(branch => selectedCityName.includes(branch));
-
-                let finalFee = 0;
-                if (isLocal) {
-                    // للمحافظات المغطاة بفروعك: أجور التوصيل فقط
-                    finalFee = (data.details && data.details.dropoff !== undefined) ? data.details.dropoff : (data.price || 0);
-                } else {
-                    // لباقي المحافظات: التكلفة الإجمالية (شحن + توصيل) مدمجة بالكامل كرقم واحد
-                    finalFee = data.price || 0;
-                }
+                // اعتماد السعر الطبيعي الموحد من بابل لجميع المحافظات بدون استثناء
+                const finalFee = data.price || 0;
 
                 resultBox.className = 'result-box success';
                 resultBox.innerHTML = `
