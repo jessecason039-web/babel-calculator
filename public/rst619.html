@@ -6,7 +6,6 @@
     <title>لوحة التاجر - إدارة وتجهيز الشحنات والفواتير</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
-    <!-- مكتبة دمج ملفات الـ PDF للطباعة المجمعة -->
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 
     <style>
@@ -60,7 +59,6 @@
             color: var(--dark);
         }
 
-        /* شريط التبويبات */
         .tabs-nav {
             display: flex;
             gap: 8px;
@@ -96,7 +94,6 @@
             box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25);
         }
 
-        /* صندوق الإدخال الجماعي */
         .bulk-textarea {
             width: 100%;
             height: 180px;
@@ -131,7 +128,6 @@
 
         .btn-parse:hover { background: var(--primary-hover); }
 
-        /* شبكة البطاقات */
         .cards-grid {
             display: flex;
             flex-direction: column;
@@ -308,7 +304,17 @@
 
         .btn-delete:hover { background: #fca5a5; }
 
-        /* شريط التحكم بالطباعة المجمعة */
+        .btn-disabled-del {
+            background: #e2e8f0;
+            color: #94a3b8;
+            border: 1px solid #cbd5e1;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 800;
+            cursor: not-allowed;
+        }
+
         .batch-toolbar {
             background: #f8fafc;
             border: 1.5px solid var(--gray-200);
@@ -400,7 +406,7 @@
     <div class="header">
         <div>
             <h1>📦 لوحة إدارة ومعالجة الطلبات وتوليد الفواتير (التاجر)</h1>
-            <div style="font-size:13px; color:var(--gray-600); margin-top:3px;">نظام الفرز المالي، تصدير الشحنات الفردي والجماعي، والطباعة المجمعة لبوالص PDF الرسمية</div>
+            <div style="font-size:13px; color:var(--gray-600); margin-top:3px;">نظام الفرز المالي، تصدير الشحنات، وحماية السجلات من الحذف الخاطئ</div>
         </div>
         <div id="dbLiveIndicator" style="font-size:12px; font-weight:700; color:var(--success);">🟢 متصل بـ MongoDB</div>
     </div>
@@ -451,8 +457,15 @@
         </div>
     </div>
 
-    <!-- 3. الطلبات المرسلة والطباعة المجمعة والتحديث والحذف الذكي -->
+    <!-- 3. الطلبات المرسلة والتتبع واسترجاع المفقود -->
     <div id="sentTab" class="tab-content" style="display:none;">
+        <!-- شريط استرجاع شحنة محذوفة بالخطأ -->
+        <div style="background:#f1f5f9; padding:10px 14px; border-radius:10px; margin-bottom:12px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; border:1px solid #cbd5e1;">
+            <span style="font-weight:800; font-size:13px; color:#0f172a;">📥 استرجاع شحنة محذوفة بالخطأ:</span>
+            <input type="text" id="recoverAwbInput" placeholder="اكتب رقم البوليصة AWB مثل 260101631112..." style="flex:1; min-width:220px; padding:7px 12px; border-radius:6px; border:1.5px solid #cbd5e1; font-size:13px; outline:none;">
+            <button onclick="recoverDeletedShipment()" class="btn-pdf" style="background:#0284c7; padding:7px 16px; font-size:13px;">استرجاع الآن</button>
+        </div>
+
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
             <h3 style="margin:0;">سجل الشحنات المصدرة إلى بابل إكسبريس (الفواتير)</h3>
             <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
@@ -512,6 +525,7 @@
                 </div>
             </div>
 
+            <!-- بطاقة التصفير -->
             <div style="background:#ecfdf5; border:2px solid #10b981; padding:20px; border-radius:12px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
                 <div>
                     <div style="font-size:14px; font-weight:700; color:#065f46;">💰 مجموع النسب المستحقة للدفع (للطلبات المسلمة فقط):</div>
@@ -963,7 +977,7 @@
     }
 
     // ==========================================
-    // 4. الطلبات المرسلة والطباعة المجمعة والتحديث والحذف الذكي
+    // 4. الطلبات المرسلة والطباعة وحماية الشحنات في المركز
     // ==========================================
     async function loadSentOrders() {
         const container = document.getElementById('sentOrdersList');
@@ -984,6 +998,16 @@
                 let badgeColor = "#0284c7";
                 if (o.orderStatus === 'delivered' || o.shipmentStatusText.includes('تم التسليم')) badgeColor = "#10b981";
                 if (o.orderStatus === 'returned' || o.shipmentStatusText.includes('مرتجع')) badgeColor = "#ef4444";
+
+                // فحص هل الشحنة أصبحت في عهدة بابل (في المركز أو خرجت للتسليم)
+                const isHandedOver = o.orderStatus === 'delivered' || 
+                                     o.orderStatus === 'returned' || 
+                                     o.shipmentStatusText.includes('نقطة التحويل') || 
+                                     o.shipmentStatusText.includes('مركز') || 
+                                     o.shipmentStatusText.includes('نقل') || 
+                                     o.shipmentStatusText.includes('للتسليم') || 
+                                     o.shipmentStatusText.includes('تم التسليم') || 
+                                     o.shipmentStatusText.includes('مرتجع');
 
                 const isPrintedBadge = o.isPrinted
                     ? `<span id="badge_${o.awb}" style="background:#ecfdf5; color:#047857; font-size:12px; padding:3px 8px; border-radius:6px; font-weight:800; border:1px solid #a7f3d0;">🖨️ تمت الطباعة ✅</span>`
@@ -1017,7 +1041,11 @@
                     </div>
 
                     <div class="card-actions" style="margin-top:12px;">
-                        <button class="btn-delete" onclick="deleteSentOrder('${o._id}', '${o.awb}')">🗑️ إلغاء وحذف الشحنة</button>
+                        ${isHandedOver ? `
+                            <button class="btn-disabled-del" title="لا يمكن حذف شحنة دخلت عهدة بابل إكسبريس">🔒 بعهدة بابل (محمية)</button>
+                        ` : `
+                            <button class="btn-delete" onclick="deleteSentOrder('${o._id}', '${o.awb}', false)">🗑️ إلغاء وحذف الشحنة</button>
+                        `}
                         <button class="btn-pdf" style="background:#475569;" onclick="trackSingleAwb('${o._id}', '${o.awb}')">🔄 تحديث الحالة من بابل</button>
                         <button class="btn-pdf" onclick="printSingleAwbPdf('${o.awb}', ${index})">🖨️ طباعة الفاتورة PDF</button>
                     </div>
@@ -1026,6 +1054,36 @@
             });
         } catch (e) {
             container.innerHTML = '<div style="color:red; text-align:center;">تعذر جلب الشحنات المرسلة.</div>';
+        }
+    }
+
+    // استرجاع شحنة محذوفة بالبوليصة AWB
+    async function recoverDeletedShipment() {
+        const awbInput = document.getElementById('recoverAwbInput');
+        const awb = awbInput.value.trim();
+        if (!awb) return alert("يرجى كتابة رقم البوليصة AWB المراد استرجاعها أولاً!");
+
+        const btn = event.currentTarget;
+        const origText = btn.innerText;
+        btn.innerText = "⏳ جاري الاسترجاع...";
+        btn.disabled = true;
+
+        try {
+            const res = await api('orders/recover', { awb });
+            btn.innerText = origText;
+            btn.disabled = false;
+
+            if (res.status === 'success') {
+                alert(`🎉 ${res.message}`);
+                awbInput.value = '';
+                loadSentOrders();
+            } else {
+                alert(`❌ ${res.message}`);
+            }
+        } catch (e) {
+            btn.innerText = origText;
+            btn.disabled = false;
+            alert("حدث خطأ أثناء الاتصال بالسيرفر لاسترجاع الشحنة.");
         }
     }
 
@@ -1170,9 +1228,6 @@
         }
     }
 
-    // ==========================================
-    // 🔄 تحديث حالة جميع الشحنات دفعة واحدة من بابل
-    // ==========================================
     async function trackAllSentOrders() {
         if (loadedSentOrdersList.length === 0) {
             return alert("لا توجد شحنات مرسلة لتحديث حالتها!");
@@ -1200,22 +1255,48 @@
         loadSentOrders();
     }
 
-    async function deleteSentOrder(id, awb) {
-        if (!confirm(`تحذير هام:\nهل أنت متأكد من إلغاء الشحنة (${awb}) وسحبها من بابل إكسبريس وحذفها نهائياً؟`)) return;
+    // حذف شحنة مع التحقق المسبق لمنع حذف ما في عهدة بابل
+    async function deleteSentOrder(id, awb, isBatch = false) {
+        const order = loadedSentOrdersList.find(o => o.awb === awb);
+        if (order) {
+            const isHandedOver = order.orderStatus === 'delivered' || 
+                                 order.orderStatus === 'returned' || 
+                                 order.shipmentStatusText.includes('نقطة التحويل') || 
+                                 order.shipmentStatusText.includes('مركز') || 
+                                 order.shipmentStatusText.includes('نقل') || 
+                                 order.shipmentStatusText.includes('للتسليم') || 
+                                 order.shipmentStatusText.includes('تم التسليم') || 
+                                 order.shipmentStatusText.includes('مرتجع');
+
+            if (isHandedOver) {
+                if (!isBatch) alert(`❌ غير مسموح بحذف الشحنة (${awb}):\nالطرد أصبح بعهدة شركة بابل إكسبريس (في المركز أو قيد النقل). يجب عمل طلب إرجاع وليس حذف.`);
+                return false;
+            }
+        }
+
+        if (!isBatch) {
+            if (!confirm(`تحذير هام:\nهل أنت متأكد من إلغاء الشحنة (${awb}) وسحبها من بابل إكسبريس وحذفها نهائياً؟`)) return false;
+        }
+
         try {
             const res = await api('orders/delete', { id, awb });
             if (res.status === 'success') {
-                alert("✅ تم إلغاء الشحنة في بابل وحذفها بنجاح!");
-                loadSentOrders();
+                if (!isBatch) {
+                    alert("✅ تم إلغاء الشحنة في بابل وحذفها بنجاح!");
+                    loadSentOrders();
+                }
+                return true;
+            } else {
+                if (!isBatch) alert(`❌ ${res.message || 'فشل الحذف'}`);
+                return false;
             }
         } catch (e) {
-            alert("خطأ في حذف الشحنة.");
+            if (!isBatch) alert("خطأ في الاتصال أثناء الحذف.");
+            return false;
         }
     }
 
-    // ==========================================
-    // 🗑️ زر الحذف الذكي (المحدد أو الكل)
-    // ==========================================
+    // زر الحذف الذكي مع حماية الشحنات المحمية في المركز
     async function handleSmartDeleteSentOrders() {
         if (loadedSentOrdersList.length === 0) {
             return alert("لا توجد شحنات مرسلة لحذفها!");
@@ -1224,11 +1305,10 @@
         const checkedBoxes = document.querySelectorAll('.sent-order-chk:checked');
 
         if (checkedBoxes.length > 0) {
-            // الشكل الأول: حذف الشحنات المحددة فقط
             const selectedAwbs = Array.from(checkedBoxes).map(chk => chk.value);
             const count = selectedAwbs.length;
 
-            if (!confirm(`⚠️ تأكيد الحذف المحدد:\nهل أنت متأكد من إلغاء وحذف الشحنات المحددة فقط (عددها: ${count} شحنة)؟\nسيتم إلغاؤها وسحبها من بابل إكسبريس وحذفها نهائياً من قاعدة البيانات.`)) {
+            if (!confirm(`⚠️ تأكيد الحذف المحدد:\nهل أنت متأكد من حذف وإلغاء الشحنات المحددة (عددها: ${count})؟\n\nملاحظة: سيتم تلقائياً استثناء أي شحنة دخلت عهدة فرع بابل لحمايتها.`)) {
                 return;
             }
 
@@ -1238,49 +1318,56 @@
             btn.disabled = true;
 
             let deletedCount = 0;
+            let protectedCount = 0;
+
             for (let awb of selectedAwbs) {
                 const order = loadedSentOrdersList.find(o => o.awb === awb);
                 if (order) {
-                    try {
-                        await api('orders/delete', { id: order._id, awb: order.awb });
-                        deletedCount++;
-                    } catch (e) {}
+                    const deleted = await deleteSentOrder(order._id, order.awb, true);
+                    if (deleted) deletedCount++;
+                    else protectedCount++;
                 }
             }
 
             btn.innerText = origText;
             btn.disabled = false;
-            alert(`✅ تم إلغاء وحذف ${deletedCount} شحنة محددة بنجاح!`);
+
+            let msg = `✅ تم حذف وإلغاء ${deletedCount} شحنة بنجاح!`;
+            if (protectedCount > 0) {
+                msg += `\n🔒 تم حماية ${protectedCount} شحنة ومنع حذفها لأنها أصبحت بعهدة بابل في المركز.`;
+            }
+            alert(msg);
             loadSentOrders();
 
         } else {
-            // الشكل الثاني: حذف جميع الشحنات بالكامل
             const totalCount = loadedSentOrdersList.length;
 
-            if (!confirm(`⚠️ تحذير شديد الخطورة:\nلم تقم بتحديد شحنات معينة بمربعات الاختيار!\nهل تريد حذف وإلغاء جميع الشحنات المرسلة بالكامل (عددها: ${totalCount} شحنة) دفعة واحدة؟\nسيتم سحبها وإلغاؤها من بابل وحذفها نهائياً من قاعدة البيانات.`)) {
-                return;
-            }
-
-            if (!confirm("تأكيد أخير ونهائي: هل تريد حقاً حذف جميع الشحنات بلا استثناء؟ لا يمكن التراجع عن هذا الإجراء.")) {
+            if (!confirm(`⚠️ تحذير شديد الخطورة:\nلم تقم بتحديد شحنات معينة بمربعات الاختيار!\nهل تريد حذف الشحنات المتاحة للحذف بالكامل؟\n\nملاحظة: سيتم حماية أي شحنة دخلت المركز ومنع حذفها تلقائياً.`)) {
                 return;
             }
 
             const btn = document.getElementById('btnSmartDelete');
             const origText = btn.innerText;
-            btn.innerText = "⏳ جاري حذف الكل...";
+            btn.innerText = "⏳ جاري فحص وحذف المتاح...";
             btn.disabled = true;
 
             let deletedCount = 0;
+            let protectedCount = 0;
+
             for (let o of loadedSentOrdersList) {
-                try {
-                    await api('orders/delete', { id: o._id, awb: o.awb });
-                    deletedCount++;
-                } catch (e) {}
+                const deleted = await deleteSentOrder(o._id, o.awb, true);
+                if (deleted) deletedCount++;
+                else protectedCount++;
             }
 
             btn.innerText = origText;
             btn.disabled = false;
-            alert(`✅ تم إلغاء وحذف جميع الشحنات (${deletedCount} شحنة) بنجاح!`);
+
+            let msg = `✅ تم حذف ${deletedCount} شحنة بنجاح من المتاحة للحذف!`;
+            if (protectedCount > 0) {
+                msg += `\n🔒 تم حماية ${protectedCount} شحنة ومنع حذفها لأنها خرجت للفرع وأصبحت بعهدة بابل.`;
+            }
+            alert(msg);
             loadSentOrders();
         }
     }
